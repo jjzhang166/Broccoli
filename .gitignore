@@ -3,3 +3,6 @@
 *.bin
 *.elf
 .DS_Store
+StdPeriph_Driver
+CMSIS
+startup
