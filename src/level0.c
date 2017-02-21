@@ -258,8 +258,8 @@ void Broccoli_Receive(DEVICE_ADDRESS *addr1, DEVICE_ADDRESS *addr2, uint8_t *dat
 {
 	uint16_t i;
 #ifdef COORDINATOR
-	Delay(100);
-Broccoli_DownLink(addr1,"Hello Router!",13);
+	//Delay(100);
+	//Broccoli_DownLink(addr1,"Hello Router!",13);
 #endif
 	if(addr1 != NULL)
 	{

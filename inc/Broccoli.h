@@ -36,7 +36,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif /* __GNUC__ */
 
 //基础设置定义
-#define MaxDataPackSize			255
+#define MaxDataPackSize			254
 #define BROCCOLI_TX_TIMEOUT		100
 #define BROCCOLI_RX_TIMEOUT		100
 #define BROCCOLI_SCAN_TIMEOUT	1000
@@ -82,6 +82,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define BROCCOLI_CMD_EtoCOK		0x22//E->C OK
 #define BROCCOLI_CMD_EtoR		0x23//E->R
 #define BROCCOLI_CMD_EtoROK		0x24//E->R OK
+#define BROCCOLI_CMD_PtoP		0x40//Point to Point no return
 
 //发送标志
 #define BROCCOLI_SENDFLAG_CtoR	0x01//C->R OK
@@ -129,7 +130,8 @@ void Radio_RXCAD(uint8_t get);
 
 void Broccoli_INIT(uint8_t type);//初始化
 void Broccoli_MainProcess(void);//主过程
-
+void Broccoli_SendData_PtoP(DEVICE_ADDRESS *addr, uint8_t *data, uint16_t length);//点对点发送数据，无返回
+void Broccoli_SendData_PtoHost(uint8_t *data, uint16_t length);//发送数据给上一级主机，无返回
 int8_t Broccoli_UpLink(uint8_t *data, uint16_t length);//向上层设备传送数据
 int8_t Broccoli_TopLink(uint8_t *data, uint16_t length);//向顶层设备传送数据
 int8_t Broccoli_DownLink(DEVICE_ADDRESS *addr, uint8_t *data, uint16_t length);//向下层设备传送数据
