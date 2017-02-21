@@ -69,14 +69,14 @@
 #define RFLR_MODEMCONFIG2_SYMBTIMEOUTMSB_MASK        0xfc
 #define RFLR_MODEMCONFIG3_MOBILE_NODE_MASK           0xF7 
 
-#define TIME_OUT_INT                                 0x80 
-#define PACKET_RECVER_INT                            0x40 
-#define CRC_ERROR_INT                                0x20 
-#define RECVER_HEAR_INT                              0x10 
-#define FIFO_SEND_OVER                               0x08 
-#define RFLR_IRQFLAGS_CAD                            0x04 
-#define RFLR_IRQFLAGS_FHSS                           0x02 
-#define RFLR_IRQFLAGS_CADD                           0x01 
+#define RFLR_IRQFLAGS_RXTIMEOUT                     0x80
+#define RFLR_IRQFLAGS_RXDONE                        0x40
+#define RFLR_IRQFLAGS_PAYLOADCRCERROR               0x20
+#define RFLR_IRQFLAGS_VALIDHEADER                   0x10
+#define RFLR_IRQFLAGS_TXDONE                        0x08
+#define RFLR_IRQFLAGS_CADDONE                       0x04
+#define RFLR_IRQFLAGS_FHSSCHANGEDCHANNEL            0x02
+#define RFLR_IRQFLAGS_CADDETECTED                   0x01
 
 #define IRQN_TXD_Value                               0xF7
 #define IRQN_RXD_Value                               0x9F
@@ -93,7 +93,6 @@
 #define SX1278_Channel6		434500000
 #define SX1278_Channel7		434700000
 
-extern volatile int SX1278_TXBUSY;
 typedef enum 
 {
    Sleep_mode	        = (unsigned char)0x00, 

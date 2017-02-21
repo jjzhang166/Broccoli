@@ -37,8 +37,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 //基础设置定义
 #define MaxDataPackSize			254
-#define BROCCOLI_TX_TIMEOUT		100
-#define BROCCOLI_RX_TIMEOUT		100
+#define BROCCOLI_RX_TIMEOUT		200
 #define BROCCOLI_SCAN_TIMEOUT	1000
 #define	BROCCOLI_EtoCBufSize	10
 #define	BROCCOLI_CtoEBufSize	10
@@ -49,19 +48,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define BROCCOLI_ROUTER				0x02//路由器
 #define BROCCOLI_FREE_ROUTER		0x03//独立工作路由器
 #define BROCCOLI_ENDDEVICE			0x04//终端设备
-
-//总线状态
-#define BROCCOLI_STATUS_IDLE	0x00//空闲状态
-#define BROCCOLI_STATUS_INIT	0x80//总线初始化状态
-#define BROCCOLI_STATUS_TXBUSY	0x01//发送忙
-#define BROCCOLI_STATUS_TXOK	0x02//发送完成
-#define BROCCOLI_STATUS_TXERR	0x04//发送错误
-#define BROCCOLI_STATUS_RXBUSY	0x08//接收忙
-#define BROCCOLI_STATUS_RXOK	0x10//接收完成
-#define BROCCOLI_STATUS_RXERR	0x20//接收错误
-#define BROCCOLI_STATUS_TXMASK	(BROCCOLI_STATUS_TXBUSY | BROCCOLI_STATUS_TXOK | BROCCOLI_STATUS_TXERR)
-#define BROCCOLI_STATUS_RXMASK	(BROCCOLI_STATUS_RXBUSY | BROCCOLI_STATUS_RXOK | BROCCOLI_STATUS_RXERR)
-#define BROCCOLI_STATUS_SNTX	(BROCCOLI_STATUS_TXBUSY | BROCCOLI_STATUS_RXBUSY)//不能发送数据状态
 
 //指令
 #define BROCCOLI_CMD_NOP		0x00//空指令
@@ -91,7 +77,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define BROCCOLI_SENDFLAG_RtoE	0x08//R->E OK
 #define BROCCOLI_SENDFLAG_EtoC	0x10//E->C OK
 #define BROCCOLI_SENDFLAG_EtoR	0x20//E->R OK
-#define BROCCOLI_SENDFLAG_NOP	0x80//收到空指令
+#define BROCCOLI_SENDFLAG_SCAN	0x80//信道内有通讯
 
 //发送指令返回值
 #define BROCCOLI_OK			0//发送完成
@@ -123,11 +109,7 @@ typedef struct{
 }CTOEBUFFER;
 #pragma pack ()
 
-void Radio_StartRX(void);//开始无线接收
-void Radio_RXDone(uint8_t err);//无线接收完成,err：1有错误，0没错误
-void Radio_TXDone(uint8_t err);//无线发送数据结束,err：1有错误，0没错误
-void Radio_RXCAD(uint8_t get);
-
+void Radio_RXData(uint8_t *data, uint16_t length);//无线接收完成
 void Broccoli_INIT(uint8_t type);//初始化
 void Broccoli_MainProcess(void);//主过程
 void Broccoli_SendData_PtoP(DEVICE_ADDRESS *addr, uint8_t *data, uint16_t length);//点对点发送数据，无返回

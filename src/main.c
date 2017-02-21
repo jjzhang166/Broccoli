@@ -26,10 +26,6 @@ int main(void) {
 	Broccoli_UpLink("Hello Coordinator!",18);
 #endif
 	while (1) {
-		#ifdef ROUTER
-		Broccoli_SendData_PtoHost("Hello Coordinator!",254-17);
-		#endif
 		Broccoli_MainProcess();
-		Delay(50);
 	}
 }
