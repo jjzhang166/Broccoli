@@ -609,7 +609,6 @@ void Broccoli_INIT(uint8_t type)
 		{
 			BusStatus = BROCCOLI_STATUS_IDLE;
 			Broccoli_SendData((uint8_t *)&buf, sizeof(buf));
-			//Radio_RXMode();
 			for(j=0;j<BROCCOLI_SCAN_TIMEOUT;j++)
 			{
 				if(BusStatus & BROCCOLI_STATUS_RXMASK)
@@ -622,14 +621,12 @@ void Broccoli_INIT(uint8_t type)
 			}
 			if((BusStatus & BROCCOLI_STATUS_RXMASK) == 0)
 			{
-				//Radio_RXMode();
 				BusStatus = BROCCOLI_STATUS_INIT;
 				return;
 			}
 			i++;
 			if(i > 16) break;
 		}
-		//Radio_RXMode();
 		BusStatus = BROCCOLI_STATUS_INIT;
 	}
 	else //搜索网络
