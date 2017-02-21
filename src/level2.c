@@ -158,6 +158,9 @@ void Radio_RXDone(uint8_t err)
 
 			switch(pRadioRxBuffer->cmd)
 			{
+			case BROCCOLI_CMD_NOP:
+				Broccoli_SendFlag |= BROCCOLI_SENDFLAG_NOP;
+				break;
 			case BROCCOLI_CMD_C_WHO://搜索信道内协调器
 				break;
 			case BROCCOLI_CMD_CtoROK:
@@ -179,6 +182,9 @@ void Radio_RXDone(uint8_t err)
 			CurrentEndDeviceFlag = 0;
 			switch(pRadioRxBuffer->cmd)
 			{
+			case BROCCOLI_CMD_NOP:
+				Broccoli_SendFlag |= BROCCOLI_SENDFLAG_NOP;
+				break;
 			case BROCCOLI_CMD_C_WHO://搜索信道内协调器
 				BusStatus |= BROCCOLI_STATUS_RXOK;
 				break;
@@ -608,21 +614,46 @@ void Broccoli_INIT(uint8_t type)
 		while(1)
 		{
 			BusStatus = BROCCOLI_STATUS_IDLE;
+			Broccoli_SendFlag = 0;
 			Broccoli_SendData((uint8_t *)&buf, sizeof(buf));
 			for(j=0;j<BROCCOLI_SCAN_TIMEOUT;j++)
 			{
-				if(BusStatus & BROCCOLI_STATUS_RXMASK)
+				if(i<8)
 				{
-					CurrentChannel++;
-					if(CurrentChannel > 7) CurrentChannel = 0;
-					Radio_SetChannel(CurrentChannel);
-					break;
+					if(BusStatus & BROCCOLI_STATUS_RXMASK)
+					{
+						CurrentChannel++;
+						if(CurrentChannel > 7) CurrentChannel = 0;
+						Radio_SetChannel(CurrentChannel);
+						break;
+					}
+				}
+				else
+				{
+					if(Broccoli_SendFlag & BROCCOLI_SENDFLAG_NOP)
+					{
+						CurrentChannel++;
+						if(CurrentChannel > 7) CurrentChannel = 0;
+						Radio_SetChannel(CurrentChannel);
+						break;
+					}
 				}
 			}
-			if((BusStatus & BROCCOLI_STATUS_RXMASK) == 0)
+			if(i<8)
 			{
-				BusStatus = BROCCOLI_STATUS_INIT;
-				return;
+				if((BusStatus & BROCCOLI_STATUS_RXMASK) == 0)
+				{
+					BusStatus = BROCCOLI_STATUS_INIT;
+					return;
+				}
+			}
+			else
+			{
+				if((Broccoli_SendFlag & BROCCOLI_SENDFLAG_NOP) == 0)
+				{
+					BusStatus = BROCCOLI_STATUS_INIT;
+					return;
+				}
 			}
 			i++;
 			if(i > 16) break;
