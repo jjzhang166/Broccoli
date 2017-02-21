@@ -1,6 +1,5 @@
 ﻿#include "USART1.h"
-//#include "wzlbus.h"
-#include "fiforx.h"
+
 char halfHEX(char v)
 {
 	if((v>=0)&&(v<=9)) return v+'0';

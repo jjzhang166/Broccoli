@@ -2,9 +2,6 @@
 #include "sx1278.h"
 #include "stm32f0xx.h"
 #include "usart1.h"
-#include "wzlbus.h"
-#include "fifotx.h"
-#include "fiforx.h"
 
 void GPIO_Configure(void);
 uint32_t Delay_Init(int freq);
