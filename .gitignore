@@ -13,6 +13,8 @@ src/system_stm32f0xx.c
 src/stm32f0xx_it.c
 inc/stm32f0xx_it.h
 inc/stm32f0xx_conf.h
+inc/usart1.h
+src/usart1.c
 stm32f030.cfg
 stm32f030.xml
 LinkerScript.ld
