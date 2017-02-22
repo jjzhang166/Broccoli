@@ -6,7 +6,7 @@
 #define RSSI_OFFSET_LF                              -164
 #define RSSI_OFFSET_HF                              -157
 
-unsigned long   Frequency = 433000000;
+unsigned long   Frequency = 433300000;
 unsigned char   SpreadingFactor = 8;    //7-12
 unsigned char   CodingRate = 2;        //1-4
 unsigned char   Bw_Frequency = 7;      //6-9

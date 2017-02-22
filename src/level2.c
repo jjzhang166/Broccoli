@@ -21,7 +21,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 #include "Broccoli.h"
-
+//#define DEBUG
 volatile static uint8_t Broccoli_init = 0;
 volatile static uint8_t Broccoli_RXFLAG = 0;
 volatile static uint8_t Broccoli_RXANYFLAG = 0;
@@ -372,7 +372,8 @@ void Radio_Send_Package_PtoP(DEVICE_ADDRESS *addr, uint8_t *data, uint16_t lengt
 	memcpy(&pRadioSendBuffer->dst_addr, addr, sizeof(DEVICE_ADDRESS));
 	memcpy(&pRadioSendBuffer->src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
 	memcpy(pRadioSendBuffer->payload, data, length);
-	return Radio_Send_Package(RadioSendBuffer, length + sizeof(BASE_PACKAGES));
+	Radio_Send_Package(RadioSendBuffer, length + sizeof(BASE_PACKAGES));
+	Radio_RXMode();
 }
 
 void Radio_Send_Package_PtoHost(uint8_t *data, uint16_t length)
