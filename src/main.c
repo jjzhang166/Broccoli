@@ -29,3 +29,36 @@ int main(void) {
 		Broccoli_MainProcess();
 	}
 }
+
+void putAddress(DEVICE_ADDRESS *addr)
+{
+	uint8_t i;
+	for(i=0;i<sizeof(DEVICE_ADDRESS);i++)
+	{
+		if(i) putch(' ');
+		putHEX(addr->addr[i]);
+	}
+}
+
+void Broccoli_Receive(DEVICE_ADDRESS *addr1, DEVICE_ADDRESS *addr2, uint8_t *data, uint16_t length)
+{
+	uint16_t i;
+#ifdef COORDINATOR
+	Delay(100);
+	Broccoli_DownLink(addr1,"Hello Router!",13);
+#endif
+	if(addr1 != NULL)
+	{
+		putstr("From:(");
+		putAddress(addr1);
+		putstr("), ");
+	}
+	if(addr2 != NULL)
+	{
+		putstr("pass:(");
+		putAddress(addr2);
+		putstr("), ");
+	}
+	for(i=0;i<length;i++) putch(data[i]);
+	putstr("\n\r");
+}

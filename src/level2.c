@@ -21,7 +21,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 #include "Broccoli.h"
-//#define DEBUG
+
 volatile static uint8_t Broccoli_init = 0;
 volatile static uint8_t Broccoli_RXFLAG = 0;
 volatile static uint8_t Broccoli_RXANYFLAG = 0;
@@ -240,7 +240,7 @@ void Radio_RXData(uint8_t *data, uint16_t length)
 	}
 	if(Broccoli_RXFLAG)
 	{
-		memcpy(RadioRxBuffer, data, length);
+		memcpy(pRadioRxBuffer, data, length);
 		RadioRxLen = length;
 	}
 }
@@ -258,7 +258,18 @@ static int8_t Radio_Send_Package_Packages(uint8_t flag, uint8_t *data, uint16_t 
 		for(j = 0; j < BROCCOLI_RX_TIMEOUT; j ++)
 		{
 			if(Broccoli_SendFlag & flag)
+			{
 				ret = BROCCOLI_OK;
+				break;
+			}
+			SystemWaitTime();
+		}
+		if(ret == BROCCOLI_OK) break;
+	}
+	if(ret == BROCCOLI_OK)
+	{
+		for(j = 0; j < BROCCOLI_RX_TIMEOUT; j ++)
+		{
 			if(Broccoli_RXFLAG)
 			{
 				Broccoli_MainProcess();
@@ -266,7 +277,6 @@ static int8_t Radio_Send_Package_Packages(uint8_t flag, uint8_t *data, uint16_t 
 			}
 			SystemWaitTime();
 		}
-		if(ret == BROCCOLI_OK) break;
 	}
 	if(DeviceType == BROCCOLI_ENDDEVICE) Radio_SleepMode();
 	if(ret == BROCCOLI_CONBRK)
@@ -334,6 +344,7 @@ static int8_t Radio_Send_Package_EtoR(uint8_t *data, uint16_t length)
 int8_t Broccoli_CtoE_Bridge(void)//R中转 C->E数据
 {
 	uint16_t i;
+	int8_t ret;
 	if(CurrentEndDeviceFlag)
 	{
 		CurrentEndDeviceFlag = 0;
@@ -345,7 +356,9 @@ int8_t Broccoli_CtoE_Bridge(void)//R中转 C->E数据
 				memcpy(&pRadioSendBuffer->dst_addr, &CtoEBuffer[i].addr, sizeof(DEVICE_ADDRESS));
 				memcpy(&pRadioSendBuffer->src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
 				memcpy(pRadioSendBuffer->payload, CtoEBuffer[i].data, CtoEBuffer[i].length);
-				return Radio_Send_Package_Packages(BROCCOLI_SENDFLAG_CtoE, RadioSendBuffer, CtoEBuffer[i].length + sizeof(BASE_PACKAGES));
+				ret = Radio_Send_Package_Packages(BROCCOLI_SENDFLAG_CtoE, RadioSendBuffer, CtoEBuffer[i].length + sizeof(BASE_PACKAGES));
+				CtoEBuffer[i].length = 0;
+				return ret;
 			}
 		}
 	}
@@ -355,11 +368,14 @@ int8_t Broccoli_CtoE_Bridge(void)//R中转 C->E数据
 int8_t Broccoli_EtoC_Bridge(void)//R中转 E->C数据
 {
 	uint16_t i;
+	int8_t ret;
 	for(i=0;i<BROCCOLI_EtoCBufSize;i++)
 	{
 		if(EtoCBuffer[i].length)
 		{
-			Radio_Send_Package_EtoC(EtoCBuffer[i].data, EtoCBuffer[i].length);
+			ret = Radio_Send_Package_EtoC(EtoCBuffer[i].data, EtoCBuffer[i].length);
+			EtoCBuffer[i].length = 0;
+			return ret;
 		}
 	}
 	return BROCCOLI_OK;
@@ -512,15 +528,15 @@ static void Broccoli_Process_R(void)//处理路由器接收的数据
 		else
 		{
 #ifdef BROCCOLI_DATARELAYMODE
-			if(length > sizeof(BASE_PACKAGES))
+			if(RadioRxLen > sizeof(BASE_PACKAGES))
 			{
 				for(i=0;i<BROCCOLI_EtoCBufSize;i++)
 				{
 					if(EtoCBuffer[i].length == 0)
 					{
-						EtoCBuffer[i].length = length - sizeof(BASE_PACKAGES) + sizeof(DEVICE_ADDRESS);
-						memcpy(EtoCBuffer[i].data, &p->src_addr, sizeof(DEVICE_ADDRESS));
-						memcpy(EtoCBuffer[i].data + sizeof(DEVICE_ADDRESS), &p->payload, length - sizeof(BASE_PACKAGES));
+						EtoCBuffer[i].length = RadioRxLen - sizeof(BASE_PACKAGES) + sizeof(DEVICE_ADDRESS);
+						memcpy(EtoCBuffer[i].data, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
+						memcpy(EtoCBuffer[i].data + sizeof(DEVICE_ADDRESS), pRadioRxBuffer->payload, RadioRxLen - sizeof(BASE_PACKAGES));
 					}
 				}
 			}
@@ -533,15 +549,15 @@ static void Broccoli_Process_R(void)//处理路由器接收的数据
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
 #ifdef BROCCOLI_DATARELAYMODE
-		if(length > (sizeof(DEVICE_ADDRESS) + sizeof(BASE_PACKAGES)))
+		if(RadioRxLen > (sizeof(DEVICE_ADDRESS) + sizeof(BASE_PACKAGES)))
 		{
 			for(i=0;i<BROCCOLI_CtoEBufSize;i++)
 			{
 				if(CtoEBuffer[i].length == 0)
 				{
-					CtoEBuffer[i].length = length - sizeof(BASE_PACKAGES) - sizeof(DEVICE_ADDRESS);
-					memcpy(&CtoEBuffer[i].addr, &p->payload, sizeof(DEVICE_ADDRESS));
-					memcpy(CtoEBuffer[i].data, &p->payload + sizeof(DEVICE_ADDRESS), EtoCBuffer[i].length);
+					CtoEBuffer[i].length = RadioRxLen - sizeof(BASE_PACKAGES) - sizeof(DEVICE_ADDRESS);
+					memcpy(&CtoEBuffer[i].addr, pRadioRxBuffer->payload, sizeof(DEVICE_ADDRESS));
+					memcpy(&CtoEBuffer[i].data, pRadioRxBuffer->payload + sizeof(DEVICE_ADDRESS), EtoCBuffer[i].length);
 				}
 			}
 		}
