@@ -58,6 +58,11 @@ __weak void Radio_RXMode(void)
 	//TODO
 }
 
+__weak void Radio_CADMode(void)
+{
+	//TODO
+}
+
 __weak void Radio_SleepMode(void)
 {
 	//TODO
@@ -124,22 +129,22 @@ void Radio_RXData(uint8_t *data, uint16_t length)
 			case BROCCOLI_CMD_NOP:
 				Broccoli_SendFlag |= BROCCOLI_SENDFLAG_SCAN;
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				break;
 			case BROCCOLI_CMD_C_WHO://搜索信道内协调器
 				Broccoli_SendFlag |= BROCCOLI_SENDFLAG_SCAN;
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				break;
 			case BROCCOLI_CMD_CtoROK:
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				if(Broccoli_init == 0) break;
 				Broccoli_SendFlag |= BROCCOLI_SENDFLAG_CtoR;
 				break;
 			case BROCCOLI_CMD_CtoEOK:
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				if(Broccoli_init == 0) break;
 				Broccoli_SendFlag |= BROCCOLI_SENDFLAG_CtoE;
 				break;
@@ -154,17 +159,17 @@ void Radio_RXData(uint8_t *data, uint16_t length)
 			{
 			case BROCCOLI_CMD_NOP:
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				Broccoli_SendFlag |= BROCCOLI_SENDFLAG_SCAN;
 				break;
 			case BROCCOLI_CMD_C_WHO://搜索信道内协调器
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				Broccoli_SendFlag |= BROCCOLI_SENDFLAG_SCAN;
 				break;
 			case BROCCOLI_CMD_C_ALLOW://C允许R加入
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				Broccoli_init  = 1;
 				if(memcmp(&HostAddress, &BroadCastAddr, sizeof(DEVICE_ADDRESS)) == 0)
 				{
@@ -184,25 +189,25 @@ void Radio_RXData(uint8_t *data, uint16_t length)
 				break;
 			case BROCCOLI_CMD_RtoCOK:
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				if(Broccoli_init == 0) break;
 				Broccoli_SendFlag |= BROCCOLI_SENDFLAG_RtoC;
 				break;
 			case BROCCOLI_CMD_RtoEOK:
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				if(Broccoli_init == 0) break;
 				Broccoli_SendFlag |= BROCCOLI_SENDFLAG_RtoE;
 				break;
 			case BROCCOLI_CMD_EtoCOK:
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				if(Broccoli_init == 0) break;
 				if(DeviceType == BROCCOLI_ROUTER) Broccoli_SendFlag |= BROCCOLI_SENDFLAG_EtoC;
 				break;
 			case BROCCOLI_CMD_CtoEOK:
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				if(Broccoli_init == 0) break;
 				if(DeviceType == BROCCOLI_ROUTER) Broccoli_SendFlag |= BROCCOLI_SENDFLAG_CtoE;
 				break;
@@ -216,19 +221,19 @@ void Radio_RXData(uint8_t *data, uint16_t length)
 			case BROCCOLI_CMD_R_ALLOW://R允许E加入
 				Broccoli_init  = 1;
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				memcpy(&HostAddress, &p->src_addr, sizeof(DEVICE_ADDRESS));
 				SaveHostAddress(&p->src_addr);
 				break;
 			case BROCCOLI_CMD_EtoCOK:
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				if(Broccoli_init == 0) break;
 				Broccoli_SendFlag |= BROCCOLI_SENDFLAG_EtoC;
 				break;
 			case BROCCOLI_CMD_EtoROK:
 				Broccoli_RXFLAG = 0;
-				Radio_RXMode();
+				Radio_CADMode();
 				if(Broccoli_init == 0) break;
 				Broccoli_SendFlag |= BROCCOLI_SENDFLAG_EtoR;
 				break;
@@ -254,7 +259,7 @@ static int8_t Radio_Send_Package_Packages(uint8_t flag, uint8_t *data, uint16_t 
 	{
 		Broccoli_SendFlag &= ~flag;
 		Radio_Send_Package(data, length);
-		Radio_RXMode();
+		Radio_CADMode();
 		for(j = 0; j < BROCCOLI_RX_TIMEOUT; j ++)
 		{
 			if(Broccoli_SendFlag & flag)
@@ -389,7 +394,7 @@ void Radio_Send_Package_PtoP(DEVICE_ADDRESS *addr, uint8_t *data, uint16_t lengt
 	memcpy(&pRadioSendBuffer->src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
 	memcpy(pRadioSendBuffer->payload, data, length);
 	Radio_Send_Package(RadioSendBuffer, length + sizeof(BASE_PACKAGES));
-	Radio_RXMode();
+	Radio_CADMode();
 }
 
 void Radio_Send_Package_PtoHost(uint8_t *data, uint16_t length)
@@ -634,7 +639,7 @@ void Broccoli_INIT(uint8_t type)
 			Broccoli_SendFlag = 0;
 			Broccoli_RXANYFLAG = 0;
 			Radio_Send_Package((uint8_t *)&buf, sizeof(buf));
-			Radio_RXMode();
+			Radio_CADMode();
 			for(j=0;j<BROCCOLI_SCAN_TIMEOUT;j++)
 			{
 				if(i<8)
@@ -663,7 +668,7 @@ void Broccoli_INIT(uint8_t type)
 				if((Broccoli_RXANYFLAG) == 0)
 				{
 					Broccoli_init = 1;
-					Radio_RXMode();
+					Radio_CADMode();
 					return;
 				}
 			}
@@ -672,7 +677,7 @@ void Broccoli_INIT(uint8_t type)
 				if((Broccoli_SendFlag & BROCCOLI_SENDFLAG_SCAN) == 0)
 				{
 					Broccoli_init = 1;
-					Radio_RXMode();
+					Radio_CADMode();
 					return;
 				}
 			}
@@ -680,7 +685,7 @@ void Broccoli_INIT(uint8_t type)
 			if(i > 16) break;
 		}
 		Broccoli_init = 1;
-		Radio_RXMode();
+		Radio_CADMode();
 	}
 	else //搜索网络
 	{
@@ -694,14 +699,14 @@ void Broccoli_INIT(uint8_t type)
 		while(1)
 		{
 			Radio_Send_Package((uint8_t *)&buf, sizeof(buf));
-			Radio_RXMode();
+			Radio_CADMode();
 			if(DeviceType == BROCCOLI_ROUTER)
 			{
 				for(j=0;j<BROCCOLI_SCAN_TIMEOUT;j++)
 				{
 					if(Broccoli_init)
 					{
-						Radio_RXMode();
+						Radio_CADMode();
 						return;
 					}
 					SystemWaitTime();
@@ -752,7 +757,7 @@ void Broccoli_MainProcess(void)
 			}
 		}
 		Broccoli_RXFLAG = 0;
-		Radio_RXMode();
+		Radio_CADMode();
 	}
 #ifdef BROCCOLI_DATARELAYMODE
 	Broccoli_CtoE_Bridge();

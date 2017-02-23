@@ -16,6 +16,7 @@ unsigned char   power_data[8]={0X80,0X80,0X80,0X83,0X86,0x89,0x8c,0x8f};
 const static uint32_t SX1278_Channels[]={SX1278_Channel0, SX1278_Channel1, SX1278_Channel2, SX1278_Channel3, SX1278_Channel4, SX1278_Channel5, SX1278_Channel6, SX1278_Channel7};
 volatile static RFMode_SET curMode = 0;
 volatile uint8_t SX1278_TXBUSY = 0;
+volatile uint8_t SX1278_RXBUSY = 0;
 
 __weak void SX1278_RxOpen(void)
 {
@@ -35,6 +36,11 @@ __weak void SX1278_EnOpen(void)
 __weak void SX1278_EnClose(void)
 {
 	//TODO
+}
+
+__weak void Radio_CADNOT(void)
+{
+	Radio_CADMode();
 }
 
 __weak unsigned char SX1278_ByteWriteReadfunc(unsigned char out)
@@ -225,6 +231,7 @@ void Radio_Send_Package(uint8_t *data, uint16_t length)
 {
 	static unsigned int i;
 	unsigned char crc = 0;
+	while(SX1278_RXBUSY);
 	SX1278_TXBUSY = 1;
 	SX1278_TxOpen();
 	SX1278LoRaSetOpMode( Stdby_mode );
@@ -242,8 +249,8 @@ void Radio_Send_Package(uint8_t *data, uint16_t length)
 	}
 	SX1278_ByteWriteReadfunc(crc);
 	SX1278_EnClose();
-	SX1278WriteBuffer(REG_LR_DIOMAPPING1,0x40);
-	SX1278WriteBuffer(REG_LR_DIOMAPPING2,0x00);
+	SX1278WriteBuffer(REG_LR_DIOMAPPING1,0x7F);
+	SX1278WriteBuffer(REG_LR_DIOMAPPING2,0xF0);
 	SX1278LoRaSetOpMode( Transmitter_mode );
 	while(SX1278_TXBUSY);
 }
@@ -255,28 +262,31 @@ void Radio_RXMode(void)
 	SX1278LoRaSetOpMode(Stdby_mode);
 	SX1278WriteBuffer(REG_LR_IRQFLAGSMASK, IRQN_RXD_Value);  //打开中断
 	SX1278WriteBuffer(REG_LR_HOPPERIOD, PACKET_MIAX_Value);
-	SX1278WriteBuffer( REG_LR_DIOMAPPING1, 0x00);
-	SX1278WriteBuffer( REG_LR_DIOMAPPING2, 0x00);
+	SX1278WriteBuffer( REG_LR_DIOMAPPING1, 0x3F);
+	SX1278WriteBuffer( REG_LR_DIOMAPPING2, 0xF0);
 	SX1278LoRaSetOpMode(Receiver_mode);
 	SX1278_RxOpen();
 }
 
 void Radio_CADMode(void)
 {
+	if(curMode == CAD_mode) return;
+	while(SX1278_RXBUSY);
 	SX1278LoRaSetOpMode( Stdby_mode );
 	SX1278WriteBuffer(REG_LR_IRQFLAGSMASK,  IRQN_CAD_Value);	//打开中断
-	SX1278WriteBuffer( REG_LR_DIOMAPPING1, 0x80 );
-	SX1278WriteBuffer( REG_LR_DIOMAPPING2, 0x00 );
+	SX1278WriteBuffer( REG_LR_DIOMAPPING1, 0xBF );
+	SX1278WriteBuffer( REG_LR_DIOMAPPING2, 0xF0 );
 	SX1278LoRaSetOpMode( CAD_mode );
 	SX1278_RxOpen();
 }
 
 void Radio_SleepMode(void)
 {
+	while(SX1278_RXBUSY);
 	SX1278LoRaSetOpMode( Stdby_mode );
 	SX1278WriteBuffer(REG_LR_IRQFLAGSMASK,  IRQN_SEELP_Value);  //打开中断
-	SX1278WriteBuffer( REG_LR_DIOMAPPING1, 0x00 );
-	SX1278WriteBuffer( REG_LR_DIOMAPPING2, 0x00 );
+	SX1278WriteBuffer( REG_LR_DIOMAPPING1, 0xFF );
+	SX1278WriteBuffer( REG_LR_DIOMAPPING2, 0xF0 );
 	SX1278LoRaSetOpMode( Sleep_mode );
 }
 
@@ -313,9 +323,11 @@ void SX1278_Interupt(void) {
 			else
 				length = 0;
 			SX1278WriteBuffer( REG_LR_IRQFLAGS, 0xff);
+			SX1278_RXBUSY = 0;
 			Radio_RXData(buf, length);
 		} else {
 			SX1278WriteBuffer( REG_LR_IRQFLAGS, 0xff);
+			SX1278_RXBUSY = 0;
 			Radio_RXData(NULL,0);
 		}
 	} else if ((RF_EX0_STATUS & 0x08) == 0x08) {
@@ -323,9 +335,12 @@ void SX1278_Interupt(void) {
 		SX1278WriteBuffer( REG_LR_IRQFLAGS, 0xff);
 	} else if ((RF_EX0_STATUS & 0x04) == 0x04) {
 		if ((RF_EX0_STATUS & 0x01) == 0x01) {
+			SX1278_RXBUSY = 1;
 			Radio_RXMode();
 		} else {
-			Radio_SleepMode();
+			SX1278_RXBUSY = 0;
+			curMode = Stdby_mode;
+			Radio_CADNOT();
 		}
 		SX1278WriteBuffer( REG_LR_IRQFLAGS, 0xff);
 	} else {
