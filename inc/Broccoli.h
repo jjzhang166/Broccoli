@@ -36,7 +36,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif /* __GNUC__ */
 
 //基础设置定义
-#define MaxDataPackSize			254
+#define MaxDataPackSize			253
 #define BROCCOLI_RX_TIMEOUT		200
 #define BROCCOLI_SCAN_TIMEOUT	1000
 #define	BROCCOLI_EtoCBufSize	2

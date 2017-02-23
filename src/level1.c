@@ -224,12 +224,13 @@ void Radio_SetChannel(uint8_t ch)
 void Radio_Send_Package(uint8_t *data, uint16_t length)
 {
 	static unsigned int i;
+	unsigned char crc = 0;
 	SX1278_TXBUSY = 1;
 	SX1278_TxOpen();
 	SX1278LoRaSetOpMode( Stdby_mode );
 	SX1278WriteBuffer( REG_LR_HOPPERIOD, 0 );	//不做频率跳变
 	SX1278WriteBuffer( REG_LR_IRQFLAGSMASK, IRQN_TXD_Value);	//打开发送中断
-	SX1278WriteBuffer( REG_LR_PAYLOADLENGTH, length + 1);	 //最大数据包
+	SX1278WriteBuffer( REG_LR_PAYLOADLENGTH, length + 2);	 //最大数据包
 	SX1278WriteBuffer( REG_LR_FIFOTXBASEADDR, 0);
 	SX1278WriteBuffer( REG_LR_FIFOADDRPTR, 0 );
 	SX1278_EnOpen();
@@ -237,7 +238,9 @@ void Radio_Send_Package(uint8_t *data, uint16_t length)
 	SX1278_ByteWriteReadfunc( 0xE1 );
 	for( i = 0; i < length; i++ ){
 	 SX1278_ByteWriteReadfunc( data[i] );
+	 crc += data[i];
 	}
+	SX1278_ByteWriteReadfunc(crc);
 	SX1278_EnClose();
 	SX1278WriteBuffer(REG_LR_DIOMAPPING1,0x40);
 	SX1278WriteBuffer(REG_LR_DIOMAPPING2,0x00);
@@ -287,15 +290,21 @@ void SX1278_Interupt(void) {
 		CRC_Value = SX1278ReadBuffer( REG_LR_MODEMCONFIG2);
 		if ((CRC_Value & 0x04) == 0x04) {
 			SX1278WriteBuffer(REG_LR_FIFOADDRPTR, 0x00);
-			length = SX1278ReadBuffer(REG_LR_NBRXBYTES) - 1;
+			length = SX1278ReadBuffer(REG_LR_NBRXBYTES) - 2;
 			if(length > 0)
 			{
+				CRC_Value = 0;
 				SX1278_EnOpen();
 				SX1278_ByteWriteReadfunc(0x00);
 				if(SX1278_ByteWriteReadfunc(0xFF) == 0xE1)
 				{
 					for (i = 0; i < length; i++) {
 						buf[i] = SX1278_ByteWriteReadfunc(0xFF);
+						CRC_Value += buf[i];
+					}
+					if(CRC_Value != SX1278_ByteWriteReadfunc(0xFF))
+					{
+						length = 0;
 					}
 				}
 				else length = 0;
@@ -303,17 +312,14 @@ void SX1278_Interupt(void) {
 			}
 			else
 				length = 0;
-			//Radio_RXMode();
 			SX1278WriteBuffer( REG_LR_IRQFLAGS, 0xff);
 			Radio_RXData(buf, length);
 		} else {
-			//Radio_RXMode();
 			SX1278WriteBuffer( REG_LR_IRQFLAGS, 0xff);
 			Radio_RXData(NULL,0);
 		}
 	} else if ((RF_EX0_STATUS & 0x08) == 0x08) {
 		SX1278_TXBUSY = 0;
-		//Radio_RXMode();
 		SX1278WriteBuffer( REG_LR_IRQFLAGS, 0xff);
 	} else if ((RF_EX0_STATUS & 0x04) == 0x04) {
 		if ((RF_EX0_STATUS & 0x01) == 0x01) {
