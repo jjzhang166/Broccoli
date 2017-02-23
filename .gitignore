@@ -21,3 +21,4 @@ LinkerScript.ld
 COORDINATOR
 ROUTER
 ENDDEVICE
+/Release/

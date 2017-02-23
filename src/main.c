@@ -3,6 +3,9 @@
 #include "stm32f0xx.h"
 #include "usart1.h"
 
+#define COORDINATOR
+//#define ROUTER
+
 void GPIO_Configure(void);
 uint32_t Delay_Init(int freq);
 void SPI1_Interface_Init(void);
@@ -44,7 +47,7 @@ void Broccoli_Receive(DEVICE_ADDRESS *addr1, DEVICE_ADDRESS *addr2, uint8_t *dat
 {
 	uint16_t i;
 #ifdef COORDINATOR
-	Delay(100);
+	Delay(200);
 	Broccoli_DownLink(addr1,"Hello Router!",13);
 #endif
 	if(addr1 != NULL)

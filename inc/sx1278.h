@@ -66,7 +66,7 @@
 #define RFLR_MODEMCONFIG2_RXPAYLOADCRC_MASK          0xFB 
 #define RFLR_MODEMCONFIG1_BW_MASK                    0x0F 
 #define RFLR_MODEMCONFIG1_IMPLICITHEADER_MASK        0xFE 
-#define RFLR_MODEMCONFIG2_SYMBTIMEOUTMSB_MASK        0xfc
+#define RFLR_MODEMCONFIG2_SYMBTIMEOUTMSB_MASK        0xFC
 #define RFLR_MODEMCONFIG3_MOBILE_NODE_MASK           0xF7 
 
 #define RFLR_IRQFLAGS_RXTIMEOUT                     0x80
@@ -119,16 +119,16 @@ unsigned char SX1278ReadBuffer(unsigned char addr);
 void SX1278LoRaSetOpMode( RFMode_SET opMode );
 void SX1278LoRaFsk( Debugging_fsk_ook opMode );
 void SX1278LoRaSetRFFrequency(unsigned long freq);
-void SX1278LoRaSetRFPower(unsigned char power );
+void SX1278LoRaSetRFPower(char power );
 void SX1278LoRaSetSpreadingFactor(unsigned char factor );
 void SX1278LoRaSetNbTrigPeaks(unsigned char value );
 void SX1278LoRaSetErrorCoding(unsigned char value );
 void SX1278LoRaSetPacketCrcOn(BOOL enable );
 void SX1278LoRaSetSignalBandwidth(unsigned char bw );
 void SX1278LoRaSetImplicitHeaderOn(BOOL enable );
-void SX1278LoRaSetSymbTimeout(unsigned int value );
+void SX1278LoRaSetSymbTimeout(unsigned short value );
 void SX1278LoRaSetPayloadLength(unsigned char value );
-void SX1278LoRaSetPreamLength(unsigned int value );
+void SX1278LoRaSetPreamLength(unsigned short value );
 void SX1278LoRaSetMobileNode(BOOL enable );
 short SX1278ReadRssi(void);
 void SX1278LORA_INT(void);
