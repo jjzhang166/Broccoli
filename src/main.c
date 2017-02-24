@@ -29,6 +29,10 @@ int main(void) {
 	Broccoli_UpLink("Hello Coordinator!",18);
 #endif
 	while (1) {
+#ifdef ROUTER
+	Delay(1000);
+	Broccoli_UpLink("Hello Coordinator!",18);
+#endif
 		Broccoli_MainProcess();
 	}
 }
@@ -47,7 +51,7 @@ void Broccoli_Receive(DEVICE_ADDRESS *addr1, DEVICE_ADDRESS *addr2, uint8_t *dat
 {
 	uint16_t i;
 #ifdef COORDINATOR
-	Delay(200);
+	Delay(20);
 	Broccoli_DownLink(addr1,"Hello Router!",13);
 #endif
 	if(addr1 != NULL)

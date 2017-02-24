@@ -446,7 +446,6 @@ static void Broccoli_Process_C(void)//处理协调器接收的数据
 	case BROCCOLI_CMD_C_WHO://搜索信道内协调器
 		if(Broccoli_init == 0) break;
 		buf.cmd = BROCCOLI_CMD_NOP;
-		SystemWaitTime();
 		Radio_Send_Package((uint8_t *)&buf, 1);
 		break;
 	case BROCCOLI_CMD_R_REQ://R请求加入C
@@ -455,7 +454,6 @@ static void Broccoli_Process_C(void)//处理协调器接收的数据
 			buf.cmd = BROCCOLI_CMD_C_ALLOW;
 			memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 			memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
-			SystemWaitTime();
 			Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
 		}
 		break;
@@ -463,7 +461,6 @@ static void Broccoli_Process_C(void)//处理协调器接收的数据
 		buf.cmd = BROCCOLI_CMD_RtoCOK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
-		SystemWaitTime();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
 
 		Broccoli_Receive(&pRadioRxBuffer->src_addr, NULL, pRadioRxBuffer->payload, RadioRxLen - sizeof(BASE_PACKAGES));
@@ -472,7 +469,6 @@ static void Broccoli_Process_C(void)//处理协调器接收的数据
 		buf.cmd = BROCCOLI_CMD_EtoCOK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
-		SystemWaitTime();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
 
 		Broccoli_Receive((DEVICE_ADDRESS *)pRadioRxBuffer->payload, &pRadioRxBuffer->src_addr, pRadioRxBuffer->payload + sizeof(DEVICE_ADDRESS), RadioRxLen - sizeof(BASE_PACKAGES) - sizeof(DEVICE_ADDRESS));
@@ -497,14 +493,12 @@ static void Broccoli_Process_R(void)//处理路由器接收的数据
 		if(DeviceType != BROCCOLI_FREE_ROUTER) break;
 		if(Broccoli_init == 0) break;
 		buf.cmd = BROCCOLI_CMD_NOP;
-		SystemWaitTime();
 		Radio_Send_Package((uint8_t *)&buf, 1);
 		break;
 	case BROCCOLI_CMD_CtoR://C->R
 		buf.cmd = BROCCOLI_CMD_CtoROK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
-		SystemWaitTime();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
 
 		Broccoli_Receive(NULL, NULL, pRadioRxBuffer->payload, RadioRxLen - sizeof(BASE_PACKAGES));
@@ -515,7 +509,6 @@ static void Broccoli_Process_R(void)//处理路由器接收的数据
 			buf.cmd = BROCCOLI_CMD_R_ALLOW;
 			memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 			memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
-			SystemWaitTime();
 			Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
 		}
 		break;
@@ -523,7 +516,6 @@ static void Broccoli_Process_R(void)//处理路由器接收的数据
 		buf.cmd = BROCCOLI_CMD_EtoROK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
-		SystemWaitTime();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
 
 		Broccoli_Receive(&pRadioRxBuffer->src_addr, NULL, pRadioRxBuffer->payload, RadioRxLen - sizeof(BASE_PACKAGES));
@@ -532,7 +524,6 @@ static void Broccoli_Process_R(void)//处理路由器接收的数据
 		buf.cmd = BROCCOLI_CMD_EtoCOK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
-		SystemWaitTime();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
 
 		if(DeviceType == BROCCOLI_FREE_ROUTER)
@@ -561,7 +552,6 @@ static void Broccoli_Process_R(void)//处理路由器接收的数据
 		buf.cmd = BROCCOLI_CMD_CtoEOK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
-		SystemWaitTime();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
 #ifdef BROCCOLI_DATARELAYMODE
 		if(RadioRxLen > (sizeof(DEVICE_ADDRESS) + sizeof(BASE_PACKAGES)))
@@ -595,7 +585,6 @@ static void Broccoli_Process_E(void)//处理终端节点接收的数据
 		buf.cmd = BROCCOLI_CMD_CtoEOK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
-		SystemWaitTime();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
 
 		Broccoli_Receive(NULL, NULL, pRadioRxBuffer->payload, RadioRxLen - sizeof(BASE_PACKAGES));
@@ -604,7 +593,6 @@ static void Broccoli_Process_E(void)//处理终端节点接收的数据
 		buf.cmd = BROCCOLI_CMD_RtoEOK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
-		SystemWaitTime();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
 
 		Broccoli_Receive(NULL, NULL, pRadioRxBuffer->payload, RadioRxLen - sizeof(BASE_PACKAGES));
@@ -750,7 +738,6 @@ void Broccoli_MainProcess(void)
 	{
 		if(RadioRxLen > 0)
 		{
-			Delay(10);
 			switch(DeviceType)
 			{
 			case BROCCOLI_COORDINATOR:
