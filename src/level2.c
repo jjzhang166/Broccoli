@@ -20,6 +20,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+#include <stdlib.h>
 #include "Broccoli.h"
 
 volatile static uint8_t Broccoli_init = 0;
@@ -254,9 +255,9 @@ static int8_t Radio_Send_Package_Packages(uint8_t flag, uint8_t *data, uint16_t 
 {
 	int8_t i,ret;
 	uint16_t j;
-	ret = BROCCOLI_CONBRK;
 	for(i = 0; i < 3; i ++)
 	{
+		ret = BROCCOLI_CONBRK;
 		Broccoli_SendFlag &= ~flag;
 		Radio_Send_Package(data, length);
 		Radio_CADMode();
@@ -270,6 +271,9 @@ static int8_t Radio_Send_Package_Packages(uint8_t flag, uint8_t *data, uint16_t 
 			SystemWaitTime();
 		}
 		if(ret == BROCCOLI_OK) break;
+		if(i == 2) break;
+		j=rand()%100;
+		while(j--) SystemWaitTime();
 	}
 	if(ret == BROCCOLI_OK)
 	{
@@ -684,6 +688,8 @@ void Broccoli_INIT(uint8_t type)
 			i++;
 			if(i > 16) break;
 		}
+		CurrentChannel = rand()%8;
+		Radio_SetChannel(CurrentChannel);
 		Broccoli_init = 1;
 		Radio_CADMode();
 	}

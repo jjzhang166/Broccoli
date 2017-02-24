@@ -3,8 +3,8 @@
 #include "stm32f0xx.h"
 #include "usart1.h"
 
-#define COORDINATOR
-//#define ROUTER
+//#define COORDINATOR
+#define ROUTER
 
 void GPIO_Configure(void);
 uint32_t Delay_Init(int freq);
