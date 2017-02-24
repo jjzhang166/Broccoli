@@ -4,7 +4,9 @@
 #include "usart1.h"
 
 //#define COORDINATOR
-#define ROUTER
+//#define ROUTER
+#define FREE_ROUTER
+//#define ENDDEVICE
 
 void GPIO_Configure(void);
 uint32_t Delay_Init(int freq);
@@ -28,10 +30,23 @@ int main(void) {
 	Broccoli_INIT(BROCCOLI_ROUTER);
 	Broccoli_UpLink("Hello Coordinator!",18);
 #endif
+#ifdef FREE_ROUTER
+	Broccoli_INIT(BROCCOLI_FREE_ROUTER);
+#endif
+#ifdef ENDDEVICE
+	Broccoli_INIT(BROCCOLI_ENDDEVICE);
+	Broccoli_UpLink("Hello Router!",13);
+#endif
 	while (1) {
 #ifdef ROUTER
 	Delay(1000);
 	Broccoli_UpLink("Hello Coordinator!",18);
+#endif
+#ifdef ENDDEVICE
+	//SleepNextWakeUp(1000);
+	Delay(1000);
+	Broccoli_UpLink("Hello Router!",13);
+	//Radio_SleepMode();
 #endif
 		Broccoli_MainProcess();
 	}
@@ -51,8 +66,12 @@ void Broccoli_Receive(DEVICE_ADDRESS *addr1, DEVICE_ADDRESS *addr2, uint8_t *dat
 {
 	uint16_t i;
 #ifdef COORDINATOR
-	Delay(20);
-	Broccoli_DownLink(addr1,"Hello Router!",13);
+	//Delay(20);
+	//Broccoli_DownLink(addr1,"Hello Router!",13);
+#endif
+#ifdef FREE_ROUTER
+	Delay(10);
+	Broccoli_DownLink(addr1,"Hello Enddevice!",16);
 #endif
 	if(addr1 != NULL)
 	{

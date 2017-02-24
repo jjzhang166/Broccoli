@@ -43,6 +43,21 @@ CTOEBUFFER CtoEBuffer[BROCCOLI_CtoEBufSize];
 #endif
 volatile static uint8_t CurrentEndDeviceFlag = 0;
 DEVICE_ADDRESS CurrentEndDeviceAddr;
+volatile uint8_t pinwakeup = 0;
+__weak void SleepNextWakeUp(uint32_t ntimes)
+{
+	uint32_t i=0;
+	//TODO
+	pinwakeup = 0;
+	if(ntimes)
+	{
+		for(i=0;i<ntimes;i++)
+		{
+			if(pinwakeup) break;
+			Delay(1);
+		}
+	}
+}
 
 __weak void SystemWaitTime(void)
 {
@@ -67,6 +82,16 @@ __weak void Radio_CADMode(void)
 __weak void Radio_SleepMode(void)
 {
 	//TODO
+}
+
+__weak uint8_t Radio_RXBusy(void)
+{
+	return 0;
+}
+
+__weak uint8_t Radio_TXBusy(void)
+{
+	return 0;
 }
 
 __weak void GetDeviceAddress (DEVICE_ADDRESS *addr)
@@ -99,6 +124,31 @@ __weak void Radio_SetChannel(uint8_t ch)
 __weak void Broccoli_Receive(DEVICE_ADDRESS *addr1, DEVICE_ADDRESS *addr2, uint8_t *data, uint16_t length)
 {
 	//TODO
+}
+
+static void Broccoli_WaitRXDone(void)
+{
+	uint16_t timeout = BROCCOLI_RX_TIMEOUT;
+	if(DeviceType == BROCCOLI_ENDDEVICE)
+		if(Radio_RXBusy() == 1) SleepNextWakeUp(BROCCOLI_RX_TIMEOUT);
+	while(Radio_RXBusy() && timeout--)
+	{
+		SystemWaitTime();
+	}
+}
+
+static void Broccoli_WaitTXDone(void)
+{
+	uint16_t timeout = BROCCOLI_TX_TIMEOUT;
+	if(DeviceType == BROCCOLI_ENDDEVICE)
+		SleepNextWakeUp(BROCCOLI_TX_TIMEOUT);
+	else
+	{
+		while(Radio_TXBusy() && timeout--)
+		{
+			SystemWaitTime();
+		}
+	}
 }
 
 uint8_t Broccoli_AllowJoinIn(DEVICE_ADDRESS *addr)
@@ -155,7 +205,7 @@ void Radio_RXData(uint8_t *data, uint16_t length, int16_t rssi)
 			break;
 		case BROCCOLI_FREE_ROUTER:
 		case BROCCOLI_ROUTER:
-			CurrentEndDeviceFlag = 0;
+			//CurrentEndDeviceFlag = 0;
 			switch(data[0])
 			{
 			case BROCCOLI_CMD_NOP:
@@ -251,7 +301,7 @@ void Radio_RXData(uint8_t *data, uint16_t length, int16_t rssi)
 	}
 }
 
-static int8_t Radio_Send_Package_Packages(uint8_t flag, uint8_t *data, uint16_t length)
+static int8_t Broccoli_Send_Package(uint8_t flag, uint8_t *data, uint16_t length)
 {
 	int8_t i,ret;
 	uint16_t j;
@@ -259,35 +309,62 @@ static int8_t Radio_Send_Package_Packages(uint8_t flag, uint8_t *data, uint16_t 
 	{
 		ret = BROCCOLI_CONBRK;
 		Broccoli_SendFlag &= ~flag;
+		Broccoli_WaitRXDone();
 		Radio_Send_Package(data, length);
+		Broccoli_WaitTXDone();
 		Radio_CADMode();
-		for(j = 0; j < BROCCOLI_RX_TIMEOUT; j ++)
+		if(DeviceType == BROCCOLI_ENDDEVICE) j = (BROCCOLI_RX_TIMEOUT/4);
+		else j = BROCCOLI_RX_TIMEOUT;
+		while(j --)
 		{
 			if(Broccoli_SendFlag & flag)
 			{
 				ret = BROCCOLI_OK;
 				break;
 			}
-			SystemWaitTime();
+			if(DeviceType == BROCCOLI_ENDDEVICE)
+			{
+				if(Radio_RXBusy() == 2) while(Radio_RXBusy());
+				else SleepNextWakeUp(BROCCOLI_RX_TIMEOUT);
+			}
+			else SystemWaitTime();
 		}
 		if(ret == BROCCOLI_OK) break;
 		if(i == 2) break;
-		j=rand()%100;
-		while(j--) SystemWaitTime();
+		j=rand()%100+1;
+		if(DeviceType == BROCCOLI_ENDDEVICE)
+		{
+			Broccoli_WaitRXDone();
+			Radio_SleepMode();
+			SleepNextWakeUp(j);
+		}
+		else
+			while(j--) SystemWaitTime();
 	}
 	if(ret == BROCCOLI_OK)
 	{
-		for(j = 0; j < BROCCOLI_RX_TIMEOUT; j ++)
+		if(DeviceType == BROCCOLI_ENDDEVICE) j = (BROCCOLI_RX_TIMEOUT/4);
+		else j = BROCCOLI_RX_TIMEOUT;
+		while(j --)
 		{
 			if(Broccoli_RXFLAG)
 			{
 				Broccoli_MainProcess();
 				j = 0;
 			}
-			SystemWaitTime();
+			if(DeviceType == BROCCOLI_ENDDEVICE)
+			{
+				if(Radio_RXBusy() == 2) while(Radio_RXBusy());
+				else SleepNextWakeUp(BROCCOLI_RX_TIMEOUT);
+			}
+			else SystemWaitTime();
 		}
 	}
-	if(DeviceType == BROCCOLI_ENDDEVICE) Radio_SleepMode();
+	if(DeviceType == BROCCOLI_ENDDEVICE)
+	{
+		Broccoli_WaitRXDone();
+		Radio_SleepMode();
+	}
 	if(ret == BROCCOLI_CONBRK)
 	{
 		if((DeviceType == BROCCOLI_ROUTER) || (DeviceType == BROCCOLI_ENDDEVICE)) Broccoli_INIT(0);
@@ -295,59 +372,59 @@ static int8_t Radio_Send_Package_Packages(uint8_t flag, uint8_t *data, uint16_t 
 	return ret;
 }
 
-static int8_t Radio_Send_Package_CtoR(DEVICE_ADDRESS *addr, uint8_t *data, uint16_t length)
+static int8_t Broccoli_Send_Package_CtoR(DEVICE_ADDRESS *addr, uint8_t *data, uint16_t length)
 {
 	pRadioSendBuffer->cmd = BROCCOLI_CMD_CtoR;
 	memcpy(&pRadioSendBuffer->dst_addr, addr, sizeof(DEVICE_ADDRESS));
 	memcpy(&pRadioSendBuffer->src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
 	memcpy(pRadioSendBuffer->payload, data, length);
-	return Radio_Send_Package_Packages(BROCCOLI_SENDFLAG_CtoR, RadioSendBuffer, length + sizeof(BASE_PACKAGES));
+	return Broccoli_Send_Package(BROCCOLI_SENDFLAG_CtoR, RadioSendBuffer, length + sizeof(BASE_PACKAGES));
 }
 
-static int8_t Radio_Send_Package_CtoE(DEVICE_ADDRESS *addrE, DEVICE_ADDRESS *addrR, uint8_t *data, uint16_t length)
+static int8_t Broccoli_Send_Package_CtoE(DEVICE_ADDRESS *addrE, DEVICE_ADDRESS *addrR, uint8_t *data, uint16_t length)
 {
 	pRadioSendBuffer->cmd = BROCCOLI_CMD_CtoE;
 	memcpy(&pRadioSendBuffer->dst_addr, addrR, sizeof(DEVICE_ADDRESS));
 	memcpy(&pRadioSendBuffer->src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
 	memcpy(pRadioSendBuffer->payload, addrE, sizeof(DEVICE_ADDRESS));
 	memcpy(pRadioSendBuffer->payload + sizeof(DEVICE_ADDRESS), data, length);
-	return Radio_Send_Package_Packages(BROCCOLI_SENDFLAG_CtoE, RadioSendBuffer, length + sizeof(BASE_PACKAGES) + sizeof(DEVICE_ADDRESS));
+	return Broccoli_Send_Package(BROCCOLI_SENDFLAG_CtoE, RadioSendBuffer, length + sizeof(BASE_PACKAGES) + sizeof(DEVICE_ADDRESS));
 }
 
-static int8_t Radio_Send_Package_RtoC(uint8_t *data, uint16_t length)
+static int8_t Broccoli_Send_Package_RtoC(uint8_t *data, uint16_t length)
 {
 	pRadioSendBuffer->cmd = BROCCOLI_CMD_RtoC;
 	memcpy(&pRadioSendBuffer->dst_addr, &HostAddress, sizeof(DEVICE_ADDRESS));
 	memcpy(&pRadioSendBuffer->src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
 	memcpy(pRadioSendBuffer->payload, data, length);
-	return Radio_Send_Package_Packages(BROCCOLI_SENDFLAG_RtoC, RadioSendBuffer, length + sizeof(BASE_PACKAGES));
+	return Broccoli_Send_Package(BROCCOLI_SENDFLAG_RtoC, RadioSendBuffer, length + sizeof(BASE_PACKAGES));
 }
 
-static int8_t Radio_Send_Package_RtoE(DEVICE_ADDRESS *addr, uint8_t *data, uint16_t length)
+static int8_t Broccoli_Send_Package_RtoE(DEVICE_ADDRESS *addr, uint8_t *data, uint16_t length)
 {
 	pRadioSendBuffer->cmd = BROCCOLI_CMD_RtoE;
 	memcpy(&pRadioSendBuffer->dst_addr, addr, sizeof(DEVICE_ADDRESS));
 	memcpy(&pRadioSendBuffer->src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
 	memcpy(pRadioSendBuffer->payload, data, length);
-	return Radio_Send_Package_Packages(BROCCOLI_SENDFLAG_RtoE, RadioSendBuffer, length + sizeof(BASE_PACKAGES));
+	return Broccoli_Send_Package(BROCCOLI_SENDFLAG_RtoE, RadioSendBuffer, length + sizeof(BASE_PACKAGES));
 }
 
-static int8_t Radio_Send_Package_EtoC(uint8_t *data, uint16_t length)
+static int8_t Broccoli_Send_Package_EtoC(uint8_t *data, uint16_t length)
 {
 	pRadioSendBuffer->cmd = BROCCOLI_CMD_EtoC;
 	memcpy(&pRadioSendBuffer->dst_addr, &HostAddress, sizeof(DEVICE_ADDRESS));
 	memcpy(&pRadioSendBuffer->src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
 	memcpy(pRadioSendBuffer->payload, data, length);
-	return Radio_Send_Package_Packages(BROCCOLI_SENDFLAG_EtoC, RadioSendBuffer, length + sizeof(BASE_PACKAGES));
+	return Broccoli_Send_Package(BROCCOLI_SENDFLAG_EtoC, RadioSendBuffer, length + sizeof(BASE_PACKAGES));
 }
 
-static int8_t Radio_Send_Package_EtoR(uint8_t *data, uint16_t length)
+static int8_t Broccoli_Send_Package_EtoR(uint8_t *data, uint16_t length)
 {
 	pRadioSendBuffer->cmd = BROCCOLI_CMD_EtoR;
 	memcpy(&pRadioSendBuffer->dst_addr, &HostAddress, sizeof(DEVICE_ADDRESS));
 	memcpy(&pRadioSendBuffer->src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
 	memcpy(pRadioSendBuffer->payload, data, length);
-	return Radio_Send_Package_Packages(BROCCOLI_SENDFLAG_EtoR, RadioSendBuffer, length + sizeof(BASE_PACKAGES));
+	return Broccoli_Send_Package(BROCCOLI_SENDFLAG_EtoR, RadioSendBuffer, length + sizeof(BASE_PACKAGES));
 }
 #ifdef BROCCOLI_DATARELAYMODE
 int8_t Broccoli_CtoE_Bridge(void)//R中转 C->E数据
@@ -365,7 +442,7 @@ int8_t Broccoli_CtoE_Bridge(void)//R中转 C->E数据
 				memcpy(&pRadioSendBuffer->dst_addr, &CtoEBuffer[i].addr, sizeof(DEVICE_ADDRESS));
 				memcpy(&pRadioSendBuffer->src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
 				memcpy(pRadioSendBuffer->payload, CtoEBuffer[i].data, CtoEBuffer[i].length);
-				ret = Radio_Send_Package_Packages(BROCCOLI_SENDFLAG_CtoE, RadioSendBuffer, CtoEBuffer[i].length + sizeof(BASE_PACKAGES));
+				ret = Broccoli_Send_Package(BROCCOLI_SENDFLAG_CtoE, RadioSendBuffer, CtoEBuffer[i].length + sizeof(BASE_PACKAGES));
 				CtoEBuffer[i].length = 0;
 				return ret;
 			}
@@ -382,7 +459,7 @@ int8_t Broccoli_EtoC_Bridge(void)//R中转 E->C数据
 	{
 		if(EtoCBuffer[i].length)
 		{
-			ret = Radio_Send_Package_EtoC(EtoCBuffer[i].data, EtoCBuffer[i].length);
+			ret = Broccoli_Send_Package_EtoC(EtoCBuffer[i].data, EtoCBuffer[i].length);
 			EtoCBuffer[i].length = 0;
 			return ret;
 		}
@@ -391,51 +468,53 @@ int8_t Broccoli_EtoC_Bridge(void)//R中转 E->C数据
 }
 #endif
 
-void Radio_Send_Package_PtoP(DEVICE_ADDRESS *addr, uint8_t *data, uint16_t length)
+void Broccoli_Send_Package_PtoP(DEVICE_ADDRESS *addr, uint8_t *data, uint16_t length)
 {
 	pRadioSendBuffer->cmd = BROCCOLI_CMD_PtoP;
 	memcpy(&pRadioSendBuffer->dst_addr, addr, sizeof(DEVICE_ADDRESS));
 	memcpy(&pRadioSendBuffer->src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
 	memcpy(pRadioSendBuffer->payload, data, length);
+	Broccoli_WaitRXDone();
 	Radio_Send_Package(RadioSendBuffer, length + sizeof(BASE_PACKAGES));
+	Broccoli_WaitTXDone();
 	Radio_CADMode();
 }
 
-void Radio_Send_Package_PtoHost(uint8_t *data, uint16_t length)
+void Broccoli_Send_Package_PtoHost(uint8_t *data, uint16_t length)
 {
-	Radio_Send_Package_PtoP(&HostAddress, data, length);
+	Broccoli_Send_Package_PtoP(&HostAddress, data, length);
 }
 
 int8_t Broccoli_UpLink(uint8_t *data, uint16_t length)
 {
 	if((length + sizeof(BASE_PACKAGES)) > MaxDataPackSize) return BROCCOLI_OUTOFDATA;
-	if(DeviceType == BROCCOLI_ROUTER) return Radio_Send_Package_RtoC(data, length);
-	if(DeviceType == BROCCOLI_ENDDEVICE) return Radio_Send_Package_EtoR(data, length);
+	if(DeviceType == BROCCOLI_ROUTER) return Broccoli_Send_Package_RtoC(data, length);
+	if(DeviceType == BROCCOLI_ENDDEVICE) return Broccoli_Send_Package_EtoR(data, length);
 	return BROCCOLI_INVOPC;
 }
 
 int8_t Broccoli_TopLink(uint8_t *data, uint16_t length)
 {
 	if((length + sizeof(BASE_PACKAGES)) > MaxDataPackSize) return BROCCOLI_OUTOFDATA;
-	if(DeviceType == BROCCOLI_ROUTER) return Radio_Send_Package_RtoC(data, length);
-	if(DeviceType == BROCCOLI_ENDDEVICE) return Radio_Send_Package_EtoC(data, length);
+	if(DeviceType == BROCCOLI_ROUTER) return Broccoli_Send_Package_RtoC(data, length);
+	if(DeviceType == BROCCOLI_ENDDEVICE) return Broccoli_Send_Package_EtoC(data, length);
 	return BROCCOLI_INVOPC;
 }
 
 int8_t Broccoli_DownLink(DEVICE_ADDRESS *addr, uint8_t *data, uint16_t length)
 {
 	if((length + sizeof(BASE_PACKAGES)) > MaxDataPackSize) return BROCCOLI_OUTOFDATA;
-	if(DeviceType == BROCCOLI_COORDINATOR) return Radio_Send_Package_CtoR(addr, data, length);
-	if(DeviceType == BROCCOLI_ROUTER) return Radio_Send_Package_RtoE(addr, data, length);
-	if(DeviceType == BROCCOLI_FREE_ROUTER) return Radio_Send_Package_RtoE(addr, data, length);
+	if(DeviceType == BROCCOLI_COORDINATOR) return Broccoli_Send_Package_CtoR(addr, data, length);
+	if(DeviceType == BROCCOLI_ROUTER) return Broccoli_Send_Package_RtoE(addr, data, length);
+	if(DeviceType == BROCCOLI_FREE_ROUTER) return Broccoli_Send_Package_RtoE(addr, data, length);
 	return BROCCOLI_INVOPC;
 }
 
 int8_t Broccoli_EndLink(DEVICE_ADDRESS *addrE, DEVICE_ADDRESS *addrR, uint8_t *data, uint16_t length)
 {
 	if((length + sizeof(BASE_PACKAGES) + sizeof(DEVICE_ADDRESS)) > MaxDataPackSize) return BROCCOLI_OUTOFDATA;
-	if(DeviceType == BROCCOLI_COORDINATOR) return Radio_Send_Package_CtoE(addrE, addrR, data, length);
-	if(DeviceType == BROCCOLI_FREE_ROUTER) return Radio_Send_Package_RtoE(addrE, data, length);
+	if(DeviceType == BROCCOLI_COORDINATOR) return Broccoli_Send_Package_CtoE(addrE, addrR, data, length);
+	if(DeviceType == BROCCOLI_FREE_ROUTER) return Broccoli_Send_Package_RtoE(addrE, data, length);
 	return BROCCOLI_INVOPC;
 }
 
@@ -450,7 +529,9 @@ static void Broccoli_Process_C(void)//处理协调器接收的数据
 	case BROCCOLI_CMD_C_WHO://搜索信道内协调器
 		if(Broccoli_init == 0) break;
 		buf.cmd = BROCCOLI_CMD_NOP;
+		Broccoli_WaitRXDone();
 		Radio_Send_Package((uint8_t *)&buf, 1);
+		Broccoli_WaitTXDone();
 		break;
 	case BROCCOLI_CMD_R_REQ://R请求加入C
 		if(Broccoli_AllowJoinIn(&pRadioRxBuffer->src_addr))
@@ -458,23 +539,27 @@ static void Broccoli_Process_C(void)//处理协调器接收的数据
 			buf.cmd = BROCCOLI_CMD_C_ALLOW;
 			memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 			memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
+			Broccoli_WaitRXDone();
 			Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
+			Broccoli_WaitTXDone();
 		}
 		break;
 	case BROCCOLI_CMD_RtoC://R->C
 		buf.cmd = BROCCOLI_CMD_RtoCOK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
+		Broccoli_WaitRXDone();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
-
+		Broccoli_WaitTXDone();
 		Broccoli_Receive(&pRadioRxBuffer->src_addr, NULL, pRadioRxBuffer->payload, RadioRxLen - sizeof(BASE_PACKAGES));
 		break;
 	case BROCCOLI_CMD_EtoC://E->C
 		buf.cmd = BROCCOLI_CMD_EtoCOK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
+		Broccoli_WaitRXDone();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
-
+		Broccoli_WaitTXDone();
 		Broccoli_Receive((DEVICE_ADDRESS *)pRadioRxBuffer->payload, &pRadioRxBuffer->src_addr, pRadioRxBuffer->payload + sizeof(DEVICE_ADDRESS), RadioRxLen - sizeof(BASE_PACKAGES) - sizeof(DEVICE_ADDRESS));
 		break;
 	default:
@@ -497,14 +582,17 @@ static void Broccoli_Process_R(void)//处理路由器接收的数据
 		if(DeviceType != BROCCOLI_FREE_ROUTER) break;
 		if(Broccoli_init == 0) break;
 		buf.cmd = BROCCOLI_CMD_NOP;
+		Broccoli_WaitRXDone();
 		Radio_Send_Package((uint8_t *)&buf, 1);
+		Broccoli_WaitTXDone();
 		break;
 	case BROCCOLI_CMD_CtoR://C->R
 		buf.cmd = BROCCOLI_CMD_CtoROK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
+		Broccoli_WaitRXDone();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
-
+		Broccoli_WaitTXDone();
 		Broccoli_Receive(NULL, NULL, pRadioRxBuffer->payload, RadioRxLen - sizeof(BASE_PACKAGES));
 		break;
 	case BROCCOLI_CMD_E_REQ://E请求加入R
@@ -513,23 +601,27 @@ static void Broccoli_Process_R(void)//处理路由器接收的数据
 			buf.cmd = BROCCOLI_CMD_R_ALLOW;
 			memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 			memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
+			Broccoli_WaitRXDone();
 			Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
+			Broccoli_WaitTXDone();
 		}
 		break;
 	case BROCCOLI_CMD_EtoR://E->R
 		buf.cmd = BROCCOLI_CMD_EtoROK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
+		Broccoli_WaitRXDone();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
-
+		Broccoli_WaitTXDone();
 		Broccoli_Receive(&pRadioRxBuffer->src_addr, NULL, pRadioRxBuffer->payload, RadioRxLen - sizeof(BASE_PACKAGES));
 		break;
 	case BROCCOLI_CMD_EtoC://E->C
 		buf.cmd = BROCCOLI_CMD_EtoCOK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
+		Broccoli_WaitRXDone();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
-
+		Broccoli_WaitTXDone();
 		if(DeviceType == BROCCOLI_FREE_ROUTER)
 		{
 			Broccoli_Receive(&pRadioRxBuffer->src_addr, NULL, pRadioRxBuffer->payload, RadioRxLen - sizeof(BASE_PACKAGES));
@@ -556,7 +648,9 @@ static void Broccoli_Process_R(void)//处理路由器接收的数据
 		buf.cmd = BROCCOLI_CMD_CtoEOK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
+		Broccoli_WaitRXDone();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
+		Broccoli_WaitTXDone();
 #ifdef BROCCOLI_DATARELAYMODE
 		if(RadioRxLen > (sizeof(DEVICE_ADDRESS) + sizeof(BASE_PACKAGES)))
 		{
@@ -589,16 +683,18 @@ static void Broccoli_Process_E(void)//处理终端节点接收的数据
 		buf.cmd = BROCCOLI_CMD_CtoEOK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
+		Broccoli_WaitRXDone();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
-
+		Broccoli_WaitTXDone();
 		Broccoli_Receive(NULL, NULL, pRadioRxBuffer->payload, RadioRxLen - sizeof(BASE_PACKAGES));
 		break;
 	case BROCCOLI_CMD_RtoE://R->E
 		buf.cmd = BROCCOLI_CMD_RtoEOK;
 		memcpy(&buf.dst_addr, &pRadioRxBuffer->src_addr, sizeof(DEVICE_ADDRESS));
 		memcpy(&buf.src_addr, &DeviceAddr, sizeof(DEVICE_ADDRESS));
+		Broccoli_WaitRXDone();
 		Radio_Send_Package((uint8_t *)&buf, sizeof(BASE_PACKAGES));
-
+		Broccoli_WaitTXDone();
 		Broccoli_Receive(NULL, NULL, pRadioRxBuffer->payload, RadioRxLen - sizeof(BASE_PACKAGES));
 		break;
 	default:
@@ -643,6 +739,7 @@ void Broccoli_INIT(uint8_t type)
 			Broccoli_SendFlag = 0;
 			Broccoli_RXANYFLAG = 0;
 			Radio_Send_Package((uint8_t *)&buf, sizeof(buf));
+			Broccoli_WaitTXDone();
 			Radio_CADMode();
 			for(j=0;j<BROCCOLI_SCAN_TIMEOUT;j++)
 			{
@@ -705,6 +802,7 @@ void Broccoli_INIT(uint8_t type)
 		while(1)
 		{
 			Radio_Send_Package((uint8_t *)&buf, sizeof(buf));
+			Broccoli_WaitTXDone();
 			Radio_CADMode();
 			if(DeviceType == BROCCOLI_ROUTER)
 			{
@@ -720,16 +818,24 @@ void Broccoli_INIT(uint8_t type)
 			}
 			else
 			{
-				for(j=0;j<BROCCOLI_RX_TIMEOUT;j++)
+				if(DeviceType == BROCCOLI_ENDDEVICE) j = (BROCCOLI_RX_TIMEOUT/4);
+				else j = BROCCOLI_RX_TIMEOUT;
+				while(j --)
 				{
 					if(Broccoli_init)
 					{
 						Radio_SleepMode();
 						return;
 					}
-					SystemWaitTime();
+					if(DeviceType == BROCCOLI_ENDDEVICE)
+					{
+						if(Radio_RXBusy() == 2) while(Radio_RXBusy());
+						else SleepNextWakeUp(BROCCOLI_RX_TIMEOUT);
+					}
+					else SystemWaitTime();
 				}
 				Radio_SleepMode();
+				SleepNextWakeUp(BROCCOLI_SCAN_TIMEOUT);
 			}
 			CurrentChannel++;
 			if(CurrentChannel > 7) CurrentChannel = 0;
@@ -763,6 +869,7 @@ void Broccoli_MainProcess(void)
 			}
 		}
 		Broccoli_RXFLAG = 0;
+		Broccoli_WaitRXDone();
 		Radio_CADMode();
 	}
 #ifdef BROCCOLI_DATARELAYMODE

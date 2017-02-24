@@ -236,9 +236,6 @@ void Radio_Send_Package(uint8_t *data, uint16_t length)
 {
 	static unsigned int i;
 	unsigned char crc = 0;
-	uint16_t timeout = BROCCOLI_RX_TIMEOUT;
-	while(SX1278_RXBUSY && timeout--) SystemWaitTime();
-	SX1278_RXBUSY = 0;
 	SX1278_TXBUSY = 1;
 	SX1278_TxOpen();
 	SX1278LoRaSetOpMode( Stdby_mode );
@@ -258,9 +255,6 @@ void Radio_Send_Package(uint8_t *data, uint16_t length)
 	SX1278WriteBuffer(REG_LR_DIOMAPPING1,0x7F);
 	SX1278WriteBuffer(REG_LR_DIOMAPPING2,0xF0);
 	SX1278LoRaSetOpMode( Transmitter_mode );
-	timeout = BROCCOLI_TX_TIMEOUT;
-	while(SX1278_TXBUSY && timeout--) SystemWaitTime();
-	SX1278_TXBUSY = 0;
 }
 
 
@@ -278,9 +272,8 @@ void Radio_RXMode(void)
 
 void Radio_CADMode(void)
 {
-	uint16_t timeout = BROCCOLI_RX_TIMEOUT;
 	if(curMode == CAD_mode) return;
-	while(SX1278_RXBUSY && timeout--) SystemWaitTime();
+	SX1278_RXBUSY = 0;
 	SX1278LoRaSetOpMode( Stdby_mode );
 	SX1278WriteBuffer(REG_LR_IRQFLAGSMASK,  IRQN_CAD_Value);	//打开中断
 	SX1278WriteBuffer( REG_LR_DIOMAPPING1, 0xBF );
@@ -291,8 +284,7 @@ void Radio_CADMode(void)
 
 void Radio_SleepMode(void)
 {
-	uint16_t timeout = BROCCOLI_RX_TIMEOUT;
-	while(SX1278_RXBUSY && timeout--) SystemWaitTime();
+	SX1278_RXBUSY = 0;
 	SX1278LoRaSetOpMode( Stdby_mode );
 	SX1278WriteBuffer(REG_LR_IRQFLAGSMASK,  IRQN_SEELP_Value);  //打开中断
 	SX1278WriteBuffer( REG_LR_DIOMAPPING1, 0xFF );
@@ -300,13 +292,26 @@ void Radio_SleepMode(void)
 	SX1278LoRaSetOpMode( Sleep_mode );
 }
 
+uint8_t Radio_RXBusy(void)
+{
+	return SX1278_RXBUSY;
+}
+
+uint8_t Radio_TXBusy(void)
+{
+	return SX1278_TXBUSY;
+}
+
+extern volatile uint8_t pinwakeup;
 void SX1278_Interupt(void) {
+	pinwakeup = 1;
 	static unsigned char RF_EX0_STATUS;
 	static unsigned char CRC_Value;
 	static int16_t i,length = 0;
 	static unsigned char buf[256];
 	RF_EX0_STATUS = SX1278ReadBuffer( REG_LR_IRQFLAGS);
 	if ((RF_EX0_STATUS & 0x40) == 0x40) {
+		SX1278_RXBUSY = 2;
 		CRC_Value = SX1278ReadBuffer( REG_LR_MODEMCONFIG2);
 		if ((CRC_Value & 0x04) == 0x04) {
 			SX1278WriteBuffer(REG_LR_FIFOADDRPTR, 0x00);
@@ -329,12 +334,12 @@ void SX1278_Interupt(void) {
 			else
 				length = 0;
 			SX1278WriteBuffer( REG_LR_IRQFLAGS, 0xff);
-			SX1278_RXBUSY = 0;
 			Radio_RXData(buf, length, -137 + SX1278ReadBuffer(REG_LR_RSSIVALUE));
+			SX1278_RXBUSY = 0;
 		} else {
 			SX1278WriteBuffer( REG_LR_IRQFLAGS, 0xff);
-			SX1278_RXBUSY = 0;
 			Radio_RXData(NULL, 0, -137);
+			SX1278_RXBUSY = 0;
 		}
 	} else if ((RF_EX0_STATUS & 0x08) == 0x08) {
 		SX1278_TXBUSY = 0;
