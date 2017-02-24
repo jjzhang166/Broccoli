@@ -5,8 +5,8 @@
 
 //#define COORDINATOR
 //#define ROUTER
-#define FREE_ROUTER
-//#define ENDDEVICE
+//#define FREE_ROUTER
+#define ENDDEVICE
 
 void GPIO_Configure(void);
 uint32_t Delay_Init(int freq);
@@ -39,52 +39,50 @@ int main(void) {
 #endif
 	while (1) {
 #ifdef ROUTER
-	Delay(1000);
-	Broccoli_UpLink("Hello Coordinator!",18);
+		Delay(1000);
+		Broccoli_UpLink("Hello Coordinator!",18);
 #endif
 #ifdef ENDDEVICE
-	//SleepNextWakeUp(1000);
-	Delay(1000);
-	Broccoli_UpLink("Hello Router!",13);
-	//Radio_SleepMode();
+		//SleepNextWakeUp(1000);
+		Delay(1000);
+		Broccoli_UpLink("Hello Router!",13);
+		//Radio_SleepMode();
 #endif
 		Broccoli_MainProcess();
 	}
 }
 
-void putAddress(DEVICE_ADDRESS *addr)
-{
+void putAddress(DEVICE_ADDRESS *addr) {
 	uint8_t i;
-	for(i=0;i<sizeof(DEVICE_ADDRESS);i++)
-	{
-		if(i) putch(' ');
+	for (i = 0; i < sizeof(DEVICE_ADDRESS); i++) {
+		if (i)
+			putch(' ');
 		putHEX(addr->addr[i]);
 	}
 }
 
-void Broccoli_Receive(DEVICE_ADDRESS *addr1, DEVICE_ADDRESS *addr2, uint8_t *data, uint16_t length)
-{
+void Broccoli_Receive(DEVICE_ADDRESS *addr1, DEVICE_ADDRESS *addr2,
+		uint8_t *data, uint16_t length) {
 	uint16_t i;
 #ifdef COORDINATOR
-	//Delay(20);
-	//Broccoli_DownLink(addr1,"Hello Router!",13);
+	Delay(20);
+	Broccoli_DownLink(addr1,"Hello Router!",13);
 #endif
 #ifdef FREE_ROUTER
 	Delay(10);
-	Broccoli_DownLink(addr1,"Hello Enddevice!",16);
+	Broccoli_DownLink(addr1, "Hello Enddevice!", 16);
 #endif
-	if(addr1 != NULL)
-	{
+	if (addr1 != NULL) {
 		putstr("From:(");
 		putAddress(addr1);
 		putstr("), ");
 	}
-	if(addr2 != NULL)
-	{
+	if (addr2 != NULL) {
 		putstr("pass:(");
 		putAddress(addr2);
 		putstr("), ");
 	}
-	for(i=0;i<length;i++) putch(data[i]);
+	for (i = 0; i < length; i++)
+		putch(data[i]);
 	putstr("\n\r");
 }

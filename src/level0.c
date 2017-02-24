@@ -4,32 +4,28 @@
 #include "sx1278.h"
 static __IO uint32_t TimingDelay = 0;
 
-uint32_t Delay_Init(int freq)
-{
+uint32_t Delay_Init(int freq) {
 	uint32_t ret;
 	RCC_ClocksTypeDef RCC_ClocksStatus;
 	RCC_GetClocksFreq(&RCC_ClocksStatus);
-	ret = SysTick_Config( RCC_ClocksStatus.HCLK_Frequency / freq);
+	ret = SysTick_Config(RCC_ClocksStatus.HCLK_Frequency / freq);
 	SysTick_CLKSourceConfig(SysTick_CLKSource_HCLK);
 	return ret;
 }
 
-void SysTick_Handler(void)
-{
-  if (TimingDelay != 0x00)
-  {
-    TimingDelay--;
-  }
+void SysTick_Handler(void) {
+	if (TimingDelay != 0x00) {
+		TimingDelay--;
+	}
 }
 
-void Delay(__IO uint32_t nTime)
-{
-  TimingDelay = nTime;
-  while(TimingDelay != 0);
+void Delay(__IO uint32_t nTime) {
+	TimingDelay = nTime;
+	while (TimingDelay != 0)
+		;
 }
 
-void GPIO_Configure(void)
-{
+void GPIO_Configure(void) {
 	GPIO_InitTypeDef GPIO_InitStructure;
 	RCC_AHBPeriphResetCmd(RCC_AHBPeriph_GPIOA | RCC_AHBPeriph_GPIOB, DISABLE);
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA | RCC_AHBPeriph_GPIOB, ENABLE);
@@ -50,18 +46,16 @@ void GPIO_Configure(void)
 }
 
 /**
-  * @brief  Configure PA2 in interrupt mode
-  * @param  None
-  * @retval None
-  */
-void EXTI0_Config(void)
-{
-	EXTI_InitTypeDef   EXTI_InitStructure;
-	GPIO_InitTypeDef   GPIO_InitStructure;
-	NVIC_InitTypeDef   NVIC_InitStructure;
+ * @brief  Configure PA2 in interrupt mode
+ * @param  None
+ * @retval None
+ */
+void EXTI0_Config(void) {
+	EXTI_InitTypeDef EXTI_InitStructure;
+	GPIO_InitTypeDef GPIO_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
 	/* Enable GPIOA clock */
 	//RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
-
 	/* Configure PA0 pin as input floating */
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
@@ -87,13 +81,12 @@ void EXTI0_Config(void)
 	NVIC_Init(&NVIC_InitStructure);
 }
 
-void SPI1_Interface_Init(void)
-{
-	GPIO_InitTypeDef  GPIO_InitStructure;
+void SPI1_Interface_Init(void) {
+	GPIO_InitTypeDef GPIO_InitStructure;
 	SPI_InitTypeDef SPI_InitStructure;
 
-	RCC_APB2PeriphResetCmd (RCC_APB2Periph_SPI1, DISABLE);
-	RCC_APB2PeriphClockCmd (RCC_APB2Periph_SPI1, ENABLE);
+	RCC_APB2PeriphResetCmd(RCC_APB2Periph_SPI1, DISABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SPI1, ENABLE);
 
 	//RCC_AHBPeriphResetCmd(RCC_AHBPeriph_GPIOA, DISABLE);
 	//RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
@@ -103,7 +96,7 @@ void SPI1_Interface_Init(void)
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_UP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
 	/* Configure SD_SPI pins: MISO */
@@ -152,82 +145,85 @@ void SPI1_Interface_Init(void)
 	GPIO_WriteBit(GPIOA, GPIO_Pin_4, Bit_SET);
 }
 
-void SX1278Reset(void)
-{
+void SX1278Reset(void) {
 	GPIO_ResetBits(GPIOA, GPIO_Pin_3);
 	Delay(10);
 	GPIO_SetBits(GPIOA, GPIO_Pin_3);
 	Delay(100);
 }
 
-unsigned char HW_SPI_InOut(unsigned char out)
-{
+unsigned char HW_SPI_InOut(unsigned char out) {
 	/* Wait until the transmit buffer is empty */
-	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET)
-	{
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET) {
 	}
 	/* Send the byte */
 	SPI_SendData8(SPI1, out);
 
 	/* Wait until a data is received */
-	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET)
-	{
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET) {
 	}
 
 	/* Return the shifted data */
 	return SPI_ReceiveData8(SPI1);
 }
 
-void HW_SPI_WR_DX(unsigned char *wbuf,unsigned char *rbuf, int len)
-{
+void HW_SPI_WR_DX(unsigned char *wbuf, unsigned char *rbuf, int len) {
 	int i;
 	GPIO_ResetBits(GPIOA, GPIO_Pin_4);
-	for(i=0;i<len;i++)
-	{
+	for (i = 0; i < len; i++) {
 		rbuf[i] = HW_SPI_InOut(wbuf[i]);
 	}
 	GPIO_SetBits(GPIOA, GPIO_Pin_4);
 }
 
-void HW_SPI_RW_HF(unsigned char *wbuf,int wlen, unsigned char *rbuf, int rlen)
-{
+void HW_SPI_RW_HF(unsigned char *wbuf, int wlen, unsigned char *rbuf, int rlen) {
 	int i;
 	GPIO_ResetBits(GPIOA, GPIO_Pin_4);
-	for(i=0;i<wlen;i++)
-	{
+	for (i = 0; i < wlen; i++) {
 		HW_SPI_InOut(wbuf[i]);
 	}
-	for(i=0;i<rlen;i++)
-	{
+	for (i = 0; i < rlen; i++) {
 		rbuf[i] = HW_SPI_InOut(0xFF);
 	}
 	GPIO_SetBits(GPIOA, GPIO_Pin_4);
 }
 
+extern volatile uint8_t pinwakeup;
 /**
-  * @brief  This function handles External line 0 to 1 interrupt request.
-  * @param  None
-  * @retval None
-  */
-void EXTI0_1_IRQHandler(void)
-{
-  if(EXTI_GetITStatus(EXTI_Line0) != RESET)
-  {
-	  SX1278_Interupt();
-    /* Clear the EXTI line 0 pending bit */
-    EXTI_ClearITPendingBit(EXTI_Line0);
-  }
+ * @brief  This function handles External line 0 to 1 interrupt request.
+ * @param  None
+ * @retval None
+ */
+void EXTI0_1_IRQHandler(void) {
+	if (EXTI_GetITStatus(EXTI_Line0) != RESET) {
+		pinwakeup = 1;
+		SX1278_Interupt();
+		/* Clear the EXTI line 0 pending bit */
+		EXTI_ClearITPendingBit(EXTI_Line0);
+	}
 }
 
-void SystemWaitTime(void)
-{
-	while((SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) == 0);
+void SystemWaitTime(void) {
+	while ((SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) == 0)
+		;
 }
 
-void GetDeviceAddress (DEVICE_ADDRESS *addr)
-{
-	uint8_t *p = (uint8_t *)0x1FFFF7AC;
-	memcpy(addr, p ,sizeof(DEVICE_ADDRESS));
+void SleepNextWakeUp(uint32_t ntimes) {
+	uint32_t i = 0;
+	//TODO
+	pinwakeup = 0;
+	if (ntimes) {
+		for (i = 0; i < ntimes; i++) {
+			if (pinwakeup)
+				break;
+			SystemWaitTime();
+		}
+	}
+}
+
+void GetDeviceAddress(DEVICE_ADDRESS *addr) {
+	uint8_t *p = (uint8_t *) 0x1FFFF7AC;
+	memcpy(addr, p, sizeof(DEVICE_ADDRESS));
 }
 
 //void SaveHostAddress (DEVICE_ADDRESS *addr)
@@ -255,17 +251,14 @@ void GetDeviceAddress (DEVICE_ADDRESS *addr)
 //	GPIO_ResetBits(GPIOB, GPIO_Pin_1);
 //}
 
-void SX1278_EnOpen(void)
-{
+void SX1278_EnOpen(void) {
 	GPIO_ResetBits(GPIOA, GPIO_Pin_4);
 }
 
-void SX1278_EnClose(void)
-{
+void SX1278_EnClose(void) {
 	GPIO_SetBits(GPIOA, GPIO_Pin_4);
 }
 
-unsigned char SX1278_ByteWriteReadfunc(unsigned char out)
-{
+unsigned char SX1278_ByteWriteReadfunc(unsigned char out) {
 	return HW_SPI_InOut(out);
 }
