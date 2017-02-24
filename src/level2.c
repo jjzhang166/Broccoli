@@ -44,21 +44,19 @@ CTOEBUFFER CtoEBuffer[BROCCOLI_CtoEBufSize];
 volatile static uint8_t CurrentEndDeviceFlag = 0;
 DEVICE_ADDRESS CurrentEndDeviceAddr;
 volatile uint8_t pinwakeup = 0;
-__weak void SleepNextWakeUp(uint32_t ntimes) {
-	uint32_t i = 0;
-	//TODO
-	pinwakeup = 0;
-	if (ntimes) {
-		for (i = 0; i < ntimes; i++) {
-			if (pinwakeup)
-				break;
-			SystemWaitTime();
-		}
-	}
-}
 
 __weak void SystemWaitTime(void) {
 	//TODO
+}
+
+__weak void SleepNextWakeUp(uint32_t ntimes) {
+	uint32_t i = 0;
+	//TODO
+	if (ntimes) {
+		for (i = 0; i < ntimes; i++) {
+			SystemWaitTime();
+		}
+	}
 }
 
 __weak void Radio_Send_Package(uint8_t *data, uint16_t length) {
@@ -78,17 +76,18 @@ __weak void Radio_SleepMode(void) {
 }
 
 __weak uint8_t Radio_RXBusy(void) {
+	//TODO
 	return 0;
 }
 
 __weak uint8_t Radio_TXBusy(void) {
+	//TODO
 	return 0;
 }
 
 __weak void GetDeviceAddress(DEVICE_ADDRESS *addr) {
-	DEVICE_ADDRESS tmp = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88 };
-	uint8_t *p = 0x1FFFF7AC;
-	memcpy(addr, &tmp, sizeof(DEVICE_ADDRESS));
+	uint8_t tmp[] = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88 };
+	memcpy(addr, tmp, sizeof(DEVICE_ADDRESS));
 }
 
 __weak void SaveHostAddress(DEVICE_ADDRESS *addr) {

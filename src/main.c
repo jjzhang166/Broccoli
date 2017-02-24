@@ -43,10 +43,9 @@ int main(void) {
 		Broccoli_UpLink("Hello Coordinator!",18);
 #endif
 #ifdef ENDDEVICE
-		//SleepNextWakeUp(1000);
-		Delay(1000);
+		SleepNextWakeUp(1000);
 		Broccoli_UpLink("Hello Router!",13);
-		//Radio_SleepMode();
+		Radio_SleepMode();
 #endif
 		Broccoli_MainProcess();
 	}
