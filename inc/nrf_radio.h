@@ -20,7 +20,7 @@
     void Radio_TXMode(void);
     void Radio_RXMode(void);
     void Radio_SleepMode(void);
-    uint8_t Radio_SendPacket(uint32_t addrL, uint8_t addrH, uint8_t *data, uint8_t length, uint32_t timeout);
-    uint8_t Radio_ReceiveData(uint8_t *data, uint8_t length, uint32_t timeout);
+    uint8_t Radio_SendPacket(uint32_t addrL, uint8_t addrH, uint8_t *data, uint8_t length);
+    uint8_t Radio_ReceiveData(uint8_t *data);
     void Radio_Configure(void);
 #endif //__WZL_NRF_RADIO_H__

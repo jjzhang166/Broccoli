@@ -24,20 +24,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdbool.h>
 #include <string.h>
 #include "nrf.h"
-#include "nrf_delay.h"
 
 #define PACKET0_S0_SIZE                  (0UL)  //!< S0 size in bits
 #define PACKET0_LEN_SIZE								 (8UL)  //!< LENGTH size in bits
 #define PACKET0_S1_SIZE                  (0UL)  //!< S1 size in bits
 #define PACKET1_BASE_ADDRESS_LENGTH      (4UL)  //!< base address length in bytes
-#define PACKET1_MAX_LENGTH               (255UL)  //!< static length in bytes
-#define PACKET1_PAYLOAD_SIZE             (255UL)  //!< payload size in bytes
+#define PACKET1_STATIC_LENGTH            (0UL)  //!< static length in bytes
+#define PACKET1_MAX_LENGTH               (255UL)  //!< payload size in bytes
 
 #define RADIO_TXMODE      1
 #define RADIO_RXMODE      2
 #define RADIO_SLEEPMODE   3
 
 static uint8_t lastmode = 0;
+static volatile uint8_t packet[PACKET1_MAX_LENGTH];
 
 void Radio_ChangeChannel(uint8_t channel)
 {
@@ -73,52 +73,34 @@ void Radio_SleepMode(void)
     lastmode = RADIO_SLEEPMODE;
 }
 
-uint8_t Radio_SendPacket(uint32_t addrL, uint8_t addrH, uint8_t *data, uint8_t length, uint32_t timeout)
+uint8_t Radio_SendPacket(uint32_t addrL, uint8_t addrH, uint8_t *data, uint8_t length)
 {
     if(lastmode != RADIO_TXMODE) Radio_TXMode();
     NRF_RADIO->BASE0 = addrL;
     NRF_RADIO->PREFIX0 = addrH;
-    NRF_RADIO->PACKETPTR = (uint32_t)data;
-    // Packet configuration
-    NRF_RADIO->PCNF1 = (RADIO_PCNF1_WHITEEN_Disabled << RADIO_PCNF1_WHITEEN_Pos)    |
-                       (RADIO_PCNF1_ENDIAN_Big << RADIO_PCNF1_ENDIAN_Pos)           |
-                       (PACKET1_BASE_ADDRESS_LENGTH << RADIO_PCNF1_BALEN_Pos)       |
-                       (length << RADIO_PCNF1_STATLEN_Pos)                          |
-                       (PACKET1_MAX_LENGTH << RADIO_PCNF1_MAXLEN_Pos);
+		if(length >= PACKET1_MAX_LENGTH) length = PACKET1_MAX_LENGTH - 1;
+    //NRF_RADIO->PACKETPTR = (uint32_t)data;
+		packet[0] = length;
+		memcpy((void *)(packet+1), data, length);
     NRF_RADIO->EVENTS_END  = 0U;//传输完成标志位，复位
     NRF_RADIO->TASKS_START = 1U;//开始传输
-    while (NRF_RADIO->EVENTS_END == 0U)//等待传输完成
-    {
-        if(timeout == 0) return 0;
-        timeout--;
-        nrf_delay_ms(1);
-    }
-    return 1;
+    while (NRF_RADIO->EVENTS_END == 0U){}//等待传输完成
+    return length;
 }
 
-uint8_t Radio_ReceiveData(uint8_t *data, uint8_t length, uint32_t timeout)
+uint8_t Radio_ReceiveData(uint8_t *data)
 {
     if(lastmode != RADIO_RXMODE) Radio_RXMode();
     NRF_RADIO->PREFIX0 = NRF_FICR->DEVICEADDR[0];  // Prefix byte of addresses 3 to 0
 		NRF_RADIO->BASE0   = NRF_FICR->DEVICEADDR[1];  // Base address for prefix 0
-    NRF_RADIO->PACKETPTR = (uint32_t)data;
-    // Packet configuration
-    NRF_RADIO->PCNF1 = (RADIO_PCNF1_WHITEEN_Disabled << RADIO_PCNF1_WHITEEN_Pos)    |
-                       (RADIO_PCNF1_ENDIAN_Big << RADIO_PCNF1_ENDIAN_Pos)           |
-                       (PACKET1_BASE_ADDRESS_LENGTH << RADIO_PCNF1_BALEN_Pos)       |
-                       (length << RADIO_PCNF1_STATLEN_Pos)                          |
-                       (PACKET1_MAX_LENGTH << RADIO_PCNF1_MAXLEN_Pos);
+    //NRF_RADIO->PACKETPTR = (uint32_t)data;
 		NRF_RADIO->EVENTS_END = 0U;//传输完成标志位，复位
 		NRF_RADIO->TASKS_START = 1U;//开始传输
-		while(NRF_RADIO->EVENTS_END == 0U)//接收完毕
-    {
-        if(timeout == 0) return 0;
-        timeout--;
-        nrf_delay_ms(1);
-    }
+		while(NRF_RADIO->EVENTS_END == 0U){}//接收完毕
     if (NRF_RADIO->CRCSTATUS == 1U)//CRC校验通过
     {
-        return 1;
+				memcpy(data, (void *)(packet+1), packet[0]);
+        return packet[0];
     }
     return 0;
 }
@@ -130,6 +112,7 @@ void Radio_Configure(void)
     NRF_RADIO->FREQUENCY = 2UL;                // Frequency bin 2, 2402MHz
     NRF_RADIO->MODE = (RADIO_MODE_MODE_Nrf_1Mbit << RADIO_MODE_MODE_Pos);
 
+		NRF_RADIO->PACKETPTR = (uint32_t)packet;
     // Radio address config
     NRF_RADIO->PREFIX0 = NRF_FICR->DEVICEADDR[0];  // Prefix byte of addresses 3 to 0
     NRF_RADIO->PREFIX1 = 0xFFFFFFFFUL;  // Prefix byte of addresses 7 to 4
@@ -147,7 +130,7 @@ void Radio_Configure(void)
     NRF_RADIO->PCNF1 = (RADIO_PCNF1_WHITEEN_Disabled << RADIO_PCNF1_WHITEEN_Pos)    |
                        (RADIO_PCNF1_ENDIAN_Big << RADIO_PCNF1_ENDIAN_Pos)           |
                        (PACKET1_BASE_ADDRESS_LENGTH << RADIO_PCNF1_BALEN_Pos)       |
-                       (PACKET1_PAYLOAD_SIZE << RADIO_PCNF1_STATLEN_Pos)           |
+                       (PACKET1_STATIC_LENGTH << RADIO_PCNF1_STATLEN_Pos)           |
                        (PACKET1_MAX_LENGTH << RADIO_PCNF1_MAXLEN_Pos);
 
     // CRC Config
@@ -162,6 +145,4 @@ void Radio_Configure(void)
         NRF_RADIO->CRCINIT = 0xFFUL;        // Initial value
         NRF_RADIO->CRCPOLY = 0x107UL;       // CRC poly: x^8+x^2^x^1+1
     }
-
-    nrf_delay_ms(3);
 }
