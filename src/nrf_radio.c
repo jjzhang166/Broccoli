@@ -24,9 +24,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdbool.h>
 #include <string.h>
 #include "nrf.h"
+#include "rtc_sleep.h"
 
 #define PACKET0_S0_SIZE                  (0UL)  //!< S0 size in bits
-#define PACKET0_LEN_SIZE								 (8UL)  //!< LENGTH size in bits
+#define PACKET0_LEN_SIZE                 (8UL)  //!< LENGTH size in bits
 #define PACKET0_S1_SIZE                  (0UL)  //!< S1 size in bits
 #define PACKET1_BASE_ADDRESS_LENGTH      (4UL)  //!< base address length in bytes
 #define PACKET1_STATIC_LENGTH            (0UL)  //!< static length in bytes
@@ -37,8 +38,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define RADIO_SLEEPMODE   3
 
 static uint8_t lastmode = 0;
-static volatile uint8_t packet[PACKET1_MAX_LENGTH];
-
+static volatile uint8_t packet[PACKET1_MAX_LENGTH + 1];
+static volatile uint8_t RadioENDFlag = 0;
 void Radio_ChangeChannel(uint8_t channel)
 {
     NRF_RADIO->FREQUENCY = channel;
@@ -75,44 +76,70 @@ void Radio_SleepMode(void)
 
 uint8_t Radio_SendPacket(uint32_t addrL, uint8_t addrH, uint8_t *data, uint8_t length)
 {
-    if(lastmode != RADIO_TXMODE) Radio_TXMode();
+    Radio_TXMode();
     NRF_RADIO->BASE0 = addrL;
     NRF_RADIO->PREFIX0 = addrH;
-		if(length >= PACKET1_MAX_LENGTH) length = PACKET1_MAX_LENGTH - 1;
+    if(length >= PACKET1_MAX_LENGTH) length = PACKET1_MAX_LENGTH - 1;
     //NRF_RADIO->PACKETPTR = (uint32_t)data;
-		packet[0] = length;
-		memcpy((void *)(packet+1), data, length);
+    packet[0] = length;
+    memcpy((void *)(packet+1), data, length);
     NRF_RADIO->EVENTS_END  = 0U;//传输完成标志位，复位
+    RadioENDFlag = 0U;
     NRF_RADIO->TASKS_START = 1U;//开始传输
-    while (NRF_RADIO->EVENTS_END == 0U){}//等待传输完成
+    while(RadioENDFlag == 0U)
+    {
+        __SEV();
+        __WFE();
+        __WFE();
+    }
+    //Radio_SleepMode();
     return length;
 }
 
-uint8_t Radio_ReceiveData(uint8_t *data)
+uint8_t Radio_ReceiveData(uint8_t *data, int32_t timeout)
 {
-    if(lastmode != RADIO_RXMODE) Radio_RXMode();
+    Radio_RXMode();
     NRF_RADIO->PREFIX0 = NRF_FICR->DEVICEADDR[0];  // Prefix byte of addresses 3 to 0
-		NRF_RADIO->BASE0   = NRF_FICR->DEVICEADDR[1];  // Base address for prefix 0
+    NRF_RADIO->BASE0   = NRF_FICR->DEVICEADDR[1];  // Base address for prefix 0
     //NRF_RADIO->PACKETPTR = (uint32_t)data;
-		NRF_RADIO->EVENTS_END = 0U;//传输完成标志位，复位
-		NRF_RADIO->TASKS_START = 1U;//开始传输
-		while(NRF_RADIO->EVENTS_END == 0U){}//接收完毕
+    NRF_RADIO->EVENTS_END = 0U;//传输完成标志位，复位
+    RadioENDFlag = 0U;
+    NRF_RADIO->TASKS_START = 1U;//开始传输
+    while(RadioENDFlag == 0U)
+    {
+        RTCSleep(timeout);
+    }
+    //Radio_SleepMode();
     if (NRF_RADIO->CRCSTATUS == 1U)//CRC校验通过
     {
-				memcpy(data, (void *)(packet+1), packet[0]);
+        memcpy(data, (void *)(packet+1), packet[0]);
         return packet[0];
     }
     return 0;
 }
 
+void Radio_Break(void)
+{
+    RadioENDFlag = 1;
+    Radio_SleepMode();
+}
+
+void RADIO_IRQHandler(void)
+{
+    NRF_RADIO->EVENTS_END = 0U;
+    RadioENDFlag = 1;
+    Radio_SleepMode();
+}
+
 void Radio_Configure(void)
 {
+    RTC_config();
     // Radio config
     NRF_RADIO->TXPOWER = (RADIO_TXPOWER_TXPOWER_Pos4dBm << RADIO_TXPOWER_TXPOWER_Pos);
     NRF_RADIO->FREQUENCY = 2UL;                // Frequency bin 2, 2402MHz
-    NRF_RADIO->MODE = (RADIO_MODE_MODE_Nrf_1Mbit << RADIO_MODE_MODE_Pos);
+    NRF_RADIO->MODE = (RADIO_MODE_MODE_Nrf_2Mbit << RADIO_MODE_MODE_Pos);
 
-		NRF_RADIO->PACKETPTR = (uint32_t)packet;
+    NRF_RADIO->PACKETPTR = (uint32_t)packet;
     // Radio address config
     NRF_RADIO->PREFIX0 = NRF_FICR->DEVICEADDR[0];  // Prefix byte of addresses 3 to 0
     NRF_RADIO->PREFIX1 = 0xFFFFFFFFUL;  // Prefix byte of addresses 7 to 4
@@ -137,12 +164,16 @@ void Radio_Configure(void)
     NRF_RADIO->CRCCNF = (RADIO_CRCCNF_LEN_Two << RADIO_CRCCNF_LEN_Pos); // Number of checksum bits
     if ((NRF_RADIO->CRCCNF & RADIO_CRCCNF_LEN_Msk) == (RADIO_CRCCNF_LEN_Two << RADIO_CRCCNF_LEN_Pos))
     {
-        NRF_RADIO->CRCINIT = 0xFFFFUL;      // Initial value
+        NRF_RADIO->CRCINIT = 0x4638UL;      // Initial value
         NRF_RADIO->CRCPOLY = 0x11021UL;     // CRC poly: x^16+x^12^x^5+1
     }
     else if ((NRF_RADIO->CRCCNF & RADIO_CRCCNF_LEN_Msk) == (RADIO_CRCCNF_LEN_One << RADIO_CRCCNF_LEN_Pos))
     {
-        NRF_RADIO->CRCINIT = 0xFFUL;        // Initial value
+        NRF_RADIO->CRCINIT = 0x38UL;        // Initial value
         NRF_RADIO->CRCPOLY = 0x107UL;       // CRC poly: x^8+x^2^x^1+1
     }
+    NRF_RADIO->INTENSET = RADIO_INTENSET_END_Msk;
+    NVIC_SetPriority(RADIO_IRQn, 1);
+    NVIC_ClearPendingIRQ(RADIO_IRQn);
+    NVIC_EnableIRQ(RADIO_IRQn); 
 }
